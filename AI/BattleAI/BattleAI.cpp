@@ -20,6 +20,7 @@
 #include "../../lib/spells/CSpellHandler.h"
 #include "../../lib/spells/ISpellMechanics.h"
 #include "../../lib/CStack.h"//todo: remove
+#include "../../lib/ScriptHandler.h"
 
 #define LOGL(text) print(text)
 #define LOGFL(text, formattingEl) print(boost::str(boost::format(text) % formattingEl))
@@ -123,6 +124,9 @@ BattleAction CBattleAI::activeStack( const CStack * stack )
 		//best action is from effective owner point if view, we are effective owner as we received "activeStack"
 
 		HypotheticBattle hb(getCbc());
+
+		scripting::PoolImpl pool(nullptr, &hb);
+        hb.pool = &pool;
 
 		PotentialTargets targets(stack, &hb);
 		if(targets.possibleAttacks.size())
@@ -399,6 +403,10 @@ void CBattleAI::attemptCastingSpell()
 		bool enemyHadTurn = false;
 
 		HypotheticBattle state(cb);
+
+		scripting::PoolImpl pool(nullptr, &state);
+		state.pool = &pool;
+
 		evaluateQueue(valueOfStack, turnOrder, &state, 0, &enemyHadTurn);
 
 		if(!enemyHadTurn)
@@ -413,13 +421,15 @@ void CBattleAI::attemptCastingSpell()
 		}
 	}
 
-	auto evaluateSpellcast = [&] (PossibleSpellcast * ps)
+	auto evaluateSpellcast = [&] (PossibleSpellcast * ps, std::shared_ptr<void>)
 	{
 		HypotheticBattle state(cb);
 
+		scripting::PoolImpl pool(nullptr, &state);
+		state.pool = &pool;
+
 		spells::BattleCast cast(&state, hero, spells::Mode::HERO, ps->spell);
-		cast.target = ps->dest;
-		cast.cast(&state, rngStub);
+		cast.cast(&state, rngStub, ps->dest);
 		ValueMap newHealthOfStack;
 		ValueMap newValueOfStack;
 
@@ -478,10 +488,12 @@ void CBattleAI::attemptCastingSpell()
 		}
 	};
 
-	std::vector<std::function<void()>> tasks;
+	using EvalRunner = ThreadPool<void>;
+
+	EvalRunner::Tasks tasks;
 
 	for(PossibleSpellcast & psc : possibleCasts)
-		tasks.push_back(std::bind(evaluateSpellcast, &psc));
+		tasks.push_back(std::bind(evaluateSpellcast, &psc, _1));
 
 	uint32_t threadCount = boost::thread::hardware_concurrency();
 
@@ -493,8 +505,15 @@ void CBattleAI::attemptCastingSpell()
 
 	CStopWatch timer;
 
-	CThreadHelper threadHelper(&tasks, threadCount);
-	threadHelper.run();
+	std::vector<std::shared_ptr<void>> scriptsPool; //todo: re-implement scripts context cache
+
+	for(uint32_t idx = 0; idx < threadCount; idx++)
+	{
+		scriptsPool.emplace_back();
+	}
+
+	EvalRunner runner(&tasks, scriptsPool);
+	runner.run();
 
 	LOGFL("Evaluation took %d ms", timer.getDiff());
 

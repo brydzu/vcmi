@@ -78,7 +78,7 @@ bool Heal::isValidTarget(const Mechanics * m, const battle::Unit * unit) const
 		//check if alive unit blocks resurrection
 		for(const BattleHex & hex : battle::Unit::getHexes(unit->getPosition(), unit->doubleWide(), unit->unitSide()))
 		{
-			auto blocking = m->cb->battleGetUnitsIf([hex, unit](const battle::Unit * other)
+			auto blocking = m->battle()->battleGetUnitsIf([hex, unit](const battle::Unit * other)
 			{
 				return other->isValidTarget(false) && other->coversPos(hex) && other != unit;
 			});

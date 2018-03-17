@@ -28,7 +28,7 @@ public:
 	void applyEffects(BattleStateProxy * battleState, vstd::RNG & rng, const Target & targets, bool indirect, bool ignoreImmunity) const override;
 
 	bool canBeCast(Problem & problem) const override;
-	bool canBeCastAt(const Target & target) const override;
+	bool canBeCastAt(Problem & problem, const Target & target) const override;
 
 	void cast(const PacketSender * server, vstd::RNG & rng, const Target & target) override final;
 	void cast(IBattleState * battleState, vstd::RNG & rng, const Target & target) override final;

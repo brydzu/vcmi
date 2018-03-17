@@ -40,7 +40,6 @@ class CMap;
 class AdventureSpellCastParameters;
 class SpellCastEnvironment;
 
-
 namespace spells
 {
 
@@ -55,7 +54,6 @@ struct SchoolInfo
 };
 
 }
-
 
 enum class VerticalPosition : ui8{TOP, CENTER, BOTTOM};
 
@@ -244,19 +242,14 @@ public:
 	CSpell();
 	~CSpell();
 
-	std::vector<BattleHex> rangeInHexes(const CBattleInfoCallback * cb, spells::Mode mode, const spells::Caster * caster, BattleHex centralHex) const;
-
 	spells::AimType getTargetType() const;
 
 	bool isCombatSpell() const;
-	bool isAdventureSpell() const;
 	bool isCreatureAbility() const;
 
 	bool isPositive() const;
 	bool isNegative() const;
 	bool isNeutral() const;
-
-	boost::logic::tribool getPositiveness() const;
 
 	bool isDamageSpell() const;
 	bool isRisingSpell() const;
@@ -270,9 +263,6 @@ public:
 	bool hasBattleEffects() const;
 	///calculate spell damage on stack taking caster`s secondary skills and affectedCreature`s bonuses into account
 	int64_t calculateDamage(const spells::Caster * caster) const;
-
-	///selects from allStacks actually affected stacks
-	std::vector<const CStack *> getAffectedStacks(const CBattleInfoCallback * cb, spells::Mode mode, const spells::Caster * caster, int spellLvl, const spells::Target & target) const;
 
 	si32 getCost(const int skillLevel) const;
 
@@ -292,6 +282,10 @@ public:
 
 	int32_t getIndex() const override;
 	int32_t getLevel() const override;
+
+	boost::logic::tribool getPositiveness() const override;
+
+	bool isAdventureSpell() const override;
 
 	/**
 	 * Returns resource name of icon for SPELL_IMMUNITY bonus
@@ -369,9 +363,6 @@ public:
 	bool canBeCast(const CBattleInfoCallback * cb, spells::Mode mode, const spells::Caster * caster) const;
 	bool canBeCast(spells::Problem & problem, const CBattleInfoCallback * cb, spells::Mode mode, const spells::Caster * caster) const;
 
-	///checks for creature immunity / anything that prevent casting *at given hex*
-	bool canBeCastAt(const CBattleInfoCallback * cb, spells::Mode mode, const spells::Caster * caster, BattleHex destination) const; //DEPREACTED
-	bool canBeCastAt(const CBattleInfoCallback * cb, spells::Mode mode, const spells::Caster * caster, const spells::Target & target) const;
 public:
 	///Server logic. Has write access to GameState via packets.
 	///May be executed on client side by (future) non-cheat-proof scripts.
@@ -424,11 +415,13 @@ private:
 
 bool DLL_LINKAGE isInScreenRange(const int3 &center, const int3 &pos); //for spells like Dimension Door
 
-class DLL_LINKAGE CSpellHandler: public CHandlerBase<SpellID, CSpell>
+class DLL_LINKAGE CSpellHandler: public CHandlerBase<SpellID, CSpell>, public spells::SpellService
 {
 public:
 	CSpellHandler();
 	virtual ~CSpellHandler();
+
+	const spells::Spell * getSpell(const SpellID & spellID) const override;
 
 	///IHandler base
 	std::vector<JsonNode> loadLegacyData(size_t dataSize) override;

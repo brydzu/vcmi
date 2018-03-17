@@ -9,6 +9,8 @@
  */
 #pragma once
 
+#include "Services.h"
+
 class CConsoleHandler;
 class CArtHandler;
 class CHeroHandler;
@@ -26,8 +28,13 @@ class CBonusTypeHandler;
 class CTerrainViewPatternConfig;
 class CRmgTemplateStorage;
 
+namespace scripting
+{
+	class ScriptHandler;
+}
+
 /// Loads and constructs several handlers
-class DLL_LINKAGE LibClasses
+class DLL_LINKAGE LibClasses : public Services
 {
 	CBonusTypeHandler * bth;
 
@@ -36,7 +43,14 @@ class DLL_LINKAGE LibClasses
 public:
 	bool IS_AI_ENABLED; //unused?
 
-	const IBonusTypeHandler * getBth() const;
+	const CreatureService * creatureService() const override;
+	const scripting::Service * scriptingService() const override;
+	const spells::SpellService * spellService() const override;
+
+	const spells::effects::Registry * spellEffects() const override;
+	spells::effects::Registry * spellEffects() override;
+
+	const IBonusTypeHandler * getBth() const; //deprecated
 
 	CArtHandler * arth;
 	CHeroHandler * heroh;
@@ -50,6 +64,7 @@ public:
 	CModHandler * modh;
 	CTerrainViewPatternConfig * terviewh;
 	CRmgTemplateStorage * tplh;
+	scripting::ScriptHandler * scriptHandler;
 
 	LibClasses(); //c-tor, loads .lods and NULLs handlers
 	~LibClasses();
@@ -59,9 +74,19 @@ public:
 
 	void loadFilesystem(bool onlyEssential);// basic initialization. should be called before init()
 
+	void scriptsLoaded();
 
 	template <typename Handler> void serialize(Handler &h, const int version)
 	{
+		if(version >= 790)
+		{
+			h & scriptHandler;//must be first (or second after modh), it can modify factories other handlers depends on
+			if(!h.saving)
+			{
+				scriptsLoaded();
+			}
+		}
+
 		h & heroh;
 		h & arth;
 		h & creh;
@@ -76,6 +101,7 @@ public:
 		h & modh;
 		h & IS_AI_ENABLED;
 		h & bth;
+
 		if(!h.saving)
 		{
 			callWhenDeserializing();

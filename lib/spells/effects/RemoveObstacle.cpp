@@ -93,7 +93,7 @@ std::set<const CObstacleInstance *> RemoveObstacle::getTargets(const Mechanics *
 	std::set<const CObstacleInstance *> possibleTargets;
 	if(m->isMassive() || alwaysMassive)
 	{
-		for(const auto & obstacle : m->cb->battleGetAllObstacles())
+		for(const auto & obstacle : m->battle()->battleGetAllObstacles())
 			if(canRemove(obstacle.get()))
 				possibleTargets.insert(obstacle.get());
 	}
@@ -101,7 +101,7 @@ std::set<const CObstacleInstance *> RemoveObstacle::getTargets(const Mechanics *
 	{
 		for(const auto & destination : target)
 			if(destination.hexValue.isValid())
-				for(const auto & obstacle : m->cb->battleGetAllObstaclesOnPos(destination.hexValue, false))
+				for(const auto & obstacle : m->battle()->battleGetAllObstaclesOnPos(destination.hexValue, false))
 					if(canRemove(obstacle.get()))
 						possibleTargets.insert(obstacle.get());
 	}

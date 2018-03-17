@@ -48,7 +48,7 @@
 #include "../lib/CModHandler.h"
 #include "../lib/CTownHandler.h"
 #include "../lib/CArtHandler.h"
-#include "../lib/CScriptingModule.h"
+#include "../lib/ScriptingService.h"
 #include "../lib/GameConstants.h"
 #include "gui/CGuiHandler.h"
 #include "../lib/logging/CBasicLogConfigurator.h"
@@ -102,7 +102,6 @@ static po::variables_map vm;
 
 //static bool setResolution = false; //set by event handling thread after resolution is adjusted
 
-static bool ermInteractiveMode = false; //structurize when time is right
 void processCommand(const std::string &message);
 static void setScreenRes(int w, int h, int bpp, bool fullscreen, int displayIndex, bool resetVideo=true);
 void dispose();
@@ -571,29 +570,28 @@ void processCommand(const std::string &message)
 //	if(LOCPLINT && LOCPLINT->cingconsole)
 //		LOCPLINT->cingconsole->print(message);
 
-	if(ermInteractiveMode)
-	{
-		if(cn == "exit")
-		{
-			ermInteractiveMode = false;
-			return;
-		}
-		else
-		{
-			if(CSH->client && CSH->client->erm)
-				CSH->client->erm->executeUserCommand(message);
-			std::cout << "erm>";
-		}
-	}
-	else if(message==std::string("die, fool"))
+	if(message==std::string("die, fool"))
 	{
 		exit(EXIT_SUCCESS);
 	}
-	else if(cn == "erm")
-	{
-		ermInteractiveMode = true;
-		std::cout << "erm>";
-	}
+//	else if(ermInteractiveMode)
+//	{
+//		if(cn == "exit")
+//		{
+//			return;
+//		}
+//		else
+//		{
+//			if(CSH->client && CSH->client->erm)
+//				CSH->client->erm->executeUserCommand(message);
+//			std::cout << "erm>";
+//		}
+//	}
+//	else if(cn == "erm")
+//	{
+//		ermInteractiveMode = true;
+//		std::cout << "erm>";
+//	}
 	else if(cn==std::string("activate"))
 	{
 		int what;

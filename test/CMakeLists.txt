@@ -27,11 +27,17 @@ set(test_SRCS
 		battle/CUnitStateMagicTest.cpp
 		battle/battle_UnitTest.cpp
 
- 		game/CGameStateTest.cpp
+		erm/ExamplesTest.cpp
 
- 		map/CMapEditManagerTest.cpp
- 		map/CMapFormatTest.cpp
- 		map/MapComparer.cpp
+		game/CGameStateTest.cpp
+
+		map/CMapEditManagerTest.cpp
+		map/CMapFormatTest.cpp
+		map/MapComparer.cpp
+
+		scripting/ScriptFixture.cpp
+		scripting/LuaSpellEffectTest.cpp
+		scripting/LuaSpellEffectAPITest.cpp
 
 		spells/AbilityCasterTest.cpp
  		spells/TargetConditionTest.cpp
@@ -71,6 +77,8 @@ set(test_HEADERS
  		CVcmiTestConfig.h
 		JsonComparer.h
 
+		scripting/ScriptFixture.h
+
  		map/MapComparer.h
 
 		spells/effects/EffectFixture.h
@@ -88,11 +96,16 @@ assign_source_group(${test_SRCS} ${test_HEADERS})
 set(mock_HEADERS
 		mock/mock_battle_IBattleState.h
 		mock/mock_battle_Unit.h
-		mock/mock_UnitInfo.h
-		mock/mock_UnitEnvironment.h
+		mock/mock_Creature.h
+		mock/mock_CreatureService.h
+		mock/mock_scripting_Context.h
+		mock/mock_scripting_Script.h
+		mock/mock_scripting_Service.h
 		mock/mock_spells_Mechanics.h
 		mock/mock_spells_Problem.h
 		mock/mock_spells_Spell.h
+		mock/mock_UnitEnvironment.h
+		mock/mock_UnitInfo.h
 		mock/mock_vstd_RNG.h
 )
 

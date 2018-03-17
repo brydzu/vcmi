@@ -13,9 +13,16 @@
 #include "ERMParser.h"
 #include "ERMScriptModule.h"
 
+#include "../../lib/IGameEventsReceiver.h"
+
+class ERMInterpreter;
+
 namespace VERMInterpreter
 {
 	using namespace ERM;
+	using ::scripting::ContextBase;
+	using ::scripting::ServerCb;
+	using ::scripting::ServerBattleCb;
 
 	//different exceptions that can be thrown during interpreting
 	class EInterpreterProblem : public std::exception
@@ -135,7 +142,7 @@ namespace VERMInterpreter
 		static const int NUM_LOCALS = 100;
 		static const int NUM_STRINGS = 10;
 		static const int NUM_FLOATINGS = 100;
-		
+
 		int & getParam(int num);
 		int & getLocal(int num);
 		std::string & getString(int num);
@@ -302,7 +309,7 @@ namespace VERMInterpreter
 
 	typedef boost::variant<char, double, int, std::string> TLiteral;
 
-	//for operator <, but this one seems to be implemented in boost alerady
+	//for operator <
 	struct _opLTvis : boost::static_visitor<bool>
 	{
 		const TLiteral & lhs;
@@ -316,15 +323,7 @@ namespace VERMInterpreter
 		}
 	};
 
-// 	bool operator<(const TLiteral & t1, const TLiteral & t2)
-// 	{
-// 		if(t1.type() == t2.type())
-// 		{
-// 			return boost::apply_visitor(_opLTvis(t1), t2);
-// 		}
-// 		throw EVermScriptExecError("These types are incomparable!");
-// 	}
-
+ 	bool operator<(const TLiteral & t1, const TLiteral & t2);
 
 	//for operator <=
 	struct _opLEvis : boost::static_visitor<bool>
@@ -431,7 +430,7 @@ namespace VERMInterpreter
 // 			else
 // 				throw EVermScriptExecError("Getting improved variant with wrongly specified type");
 // 		}
-// 		
+//
 // 		IntVarinant(const VNode & val) : TBasicVariant(val)
 // 		{}
 // 		IntVarinant(const VNIL & val) : TBasicVariant(val)
@@ -452,12 +451,12 @@ namespace VERMInterpreter
 // 		{
 // 			return *this;
 // 		}
-// 
+//
 // 		IntVarinant()
 // 		{}
 // 	};
 
-	
+
 
 	///main environment class, manages symbols
 	class Environment
@@ -469,8 +468,8 @@ namespace VERMInterpreter
 	public:
 		Environment() : parent(nullptr)
 		{}
-		void setPatent(Environment * _parent);
-		Environment * getPatent() const;
+		void setParent(Environment * _parent);
+		Environment * getParent() const;
 		enum EIsBoundMode {GLOBAL_ONLY, LOCAL_ONLY, ANYWHERE};
 		bool isBound(const std::string & name, EIsBoundMode mode) const;
 
@@ -480,6 +479,18 @@ namespace VERMInterpreter
 		///returns true if symbol was really unbound
 		bool unbind(const std::string & name, EUnbindMode mode);
 
+		template <typename T>
+		void localBindLiteral(const std::string & name, const T & value)
+		{
+			TLiteral val;
+			val = value;
+
+			VOption sym;
+			sym = val;
+
+			localBind(name, sym);
+		}
+
 		void localBind(std::string name, const VOption & sym);
 		void bindAtFirstHit(std::string name, const VOption & sym); //if symbol is locally defines, it gets overwritten; otherwise it is bind globally
 	};
@@ -487,8 +498,9 @@ namespace VERMInterpreter
 	//this class just introduces a new dynamic range when instantiated, nothing more
 	class IntroduceDynamicEnv
 	{
+		ERMInterpreter * interp;
 	public:
-		IntroduceDynamicEnv();
+		IntroduceDynamicEnv(ERMInterpreter * interp_);
 		~IntroduceDynamicEnv();
 	};
 
@@ -560,7 +572,7 @@ namespace VERMInterpreter
 			return *this;
 		}
 
-		VOption operator()(VermTreeIterator params);
+		VOption operator()(ERMInterpreter * interp, VermTreeIterator params);
 	};
 
 	struct OptionConverterVisitor : boost::static_visitor<VOption>
@@ -591,8 +603,6 @@ namespace VERMInterpreter
 
 	void printVOption(const VOption & opt);
 }
-
-class ERMInterpreter;
 
 struct TriggerIdentifierMatch
 {
@@ -770,7 +780,7 @@ public:
 	OPERATOR_DEFINITION_INTEGER(%)
 };
 
-class ERMInterpreter : public CScriptingModule
+class ERMInterpreter : public ::scripting::ContextBase, public IGameEventsReceiver, public IBattleEventsReceiver
 {
 /*not so*/ public:
 // 	friend class ScriptScanner;
@@ -785,12 +795,15 @@ class ERMInterpreter : public CScriptingModule
 	std::vector<VERMInterpreter::FileInfo*> files;
 	std::vector< VERMInterpreter::FileInfo* > fileInfos;
 	std::map<VERMInterpreter::LinePointer, ERM::TLine> scripts;
-	std::map<VERMInterpreter::LexicalPtr, VERMInterpreter::Environment> lexicalEnvs;
+//	std::map<VERMInterpreter::LexicalPtr, VERMInterpreter::Environment> lexicalEnvs;
 	ERM::TLine &retrieveLine(VERMInterpreter::LinePointer linePtr);
 	static ERM::TTriggerBase & retrieveTrigger(ERM::TLine &line);
 
 	VERMInterpreter::Environment * globalEnv;
+	VERMInterpreter::Environment * topDyn;
+
 	VERMInterpreter::ERMEnvironment * ermGlobalEnv;
+
 	typedef std::map<VERMInterpreter::TriggerType, std::vector<VERMInterpreter::Trigger> > TtriggerListType;
 	TtriggerListType triggers, postTriggers;
 	VERMInterpreter::Trigger * curTrigger;
@@ -821,28 +834,43 @@ class ERMInterpreter : public CScriptingModule
 	VERMInterpreter::VOptionList evalEach( VERMInterpreter::VermTreeIterator list, VERMInterpreter::Environment * env = nullptr );
 
 public:
+	using ContextBase::logger;
+
+	VERMInterpreter::ServerCb * acb;
+	VERMInterpreter::ServerBattleCb * bacb;
+	const IGameInfoCallback * icb;
+	const CBattleInfoCallback * bicb;
+
 	typedef std::map< int, std::vector<int> > TIDPattern;
 	void executeInstructions(); //called when starting a new game, before most of the map settings are done
 	void executeTriggerType(VERMInterpreter::TriggerType tt, bool pre, const TIDPattern & identifier, const std::vector<int> &funParams=std::vector<int>()); //use this to run triggers
 	void executeTriggerType(const char *trigger, int id); //convenience version of above, for pre-trigger when there is only one argument
 	void executeTriggerType(const char *trigger); //convenience version of above, for pre-trigger when there are no args
 	void setCurrentlyVisitedObj(int3 pos); //sets v998 - v1000 to given value
-	void scanForScripts();
 
 	enum EPrintMode{ALL, ERM_ONLY, VERM_ONLY};
 	void printScripts(EPrintMode mode = ALL);
 	void scanScripts(); //scans for functions, triggers etc.
 
-	ERMInterpreter();
+	ERMInterpreter(vstd::CLoggerBase * logger_);
+	virtual ~ERMInterpreter();
 	bool checkCondition( ERM::Tcondition cond );
 	int getRealLine(const VERMInterpreter::LinePointer &lp);
 
-	//overload CScriptingModule
+	void loadScript(const std::string & name, const std::string & source);
+
+	JsonNode callGlobal(const std::string & name, const JsonNode & parameters) override;
+	JsonNode callGlobal(VERMInterpreter::ServerCb * cb, const std::string & name, const JsonNode & parameters) override;
+	JsonNode callGlobal(VERMInterpreter::ServerBattleCb * cb, const std::string & name, const JsonNode & parameters) override;
+
+	void setGlobal(const std::string & name, int value) override;
+	void setGlobal(const std::string & name, const std::string & value) override;
+	void setGlobal(const std::string & name, double value) override;
+
+	void init(const IGameInfoCallback * cb, const CBattleInfoCallback * battleCb);//sets up environment etc.
+//	virtual void executeUserCommand(const std::string &cmd) override;
+
 	virtual void heroVisit(const CGHeroInstance *visitor, const CGObjectInstance *visitedObj, bool start) override;
-	virtual void init() override;//sets up environment etc.
-	virtual void executeUserCommand(const std::string &cmd) override;
-	virtual void giveInfoCB(CPrivilegedInfoCallback *cb) override;
-	virtual void giveActionCB(IGameEventRealizer *cb) override;
 
 	virtual void battleStart(const CCreatureSet *army1, const CCreatureSet *army2, int3 tile, const CGHeroInstance *hero1, const CGHeroInstance *hero2, bool side) override;
 
@@ -856,5 +884,11 @@ public:
 		else
 			throw VERMInterpreter::EScriptExecError("Wrong cast attempted, object is not of a desired type!");
 	}
+
+    void checkActionCallback() const;
+
+    //action helpers
+
+	void showInfoDialog(const std::string & msg, PlayerColor player);
 
 };

@@ -1335,6 +1335,22 @@ JsonNode Bonus::toJsonNode() const
 		root["subtype"] = subtypeToJson(type, subtype);
 	if(additionalInfo != CAddInfo::NONE)
 		root["addInfo"] = additionalInfoToJson(type, additionalInfo);
+	if(duration != 0)
+	{
+		JsonNode durationVec(JsonNode::JsonType::DATA_VECTOR);
+		for(auto & kv : bonusDurationMap)
+		{
+			if(duration & kv.second)
+				durationVec.Vector().push_back(JsonUtils::stringNode(kv.first));
+		}
+		root["duration"] = durationVec;
+	}
+	if(turnsRemain != 0)
+		root["turns"].Integer() = turnsRemain;
+	if(source != OTHER)
+		root["source"].String() = vstd::findKey(bonusSourceMap, source);
+	if(sid != 0)
+		root["sourceID"].Integer() = sid;
 	if(val != 0)
 		root["val"].Integer() = val;
 	if(valType != ADDITIVE_VALUE)
@@ -1608,8 +1624,8 @@ int CCreatureTypeLimiter::limit(const BonusLimitationContext &context) const
 	//drop bonus if it's not our creature and (we don`t check upgrades or its not our upgrade)
 }
 
-CCreatureTypeLimiter::CCreatureTypeLimiter(const CCreature &Creature, bool IncludeUpgrades)
-	:creature(&Creature), includeUpgrades(IncludeUpgrades)
+CCreatureTypeLimiter::CCreatureTypeLimiter(const CCreature & creature_, bool IncludeUpgrades)
+	: creature(&creature_), includeUpgrades(IncludeUpgrades)
 {
 }
 

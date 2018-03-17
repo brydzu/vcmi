@@ -142,6 +142,7 @@ set(lib_SRCS
 		CModHandler.cpp
 		CPathfinder.cpp
 		CRandomGenerator.cpp
+		CScriptingModule.cpp
 		CSkillHandler.cpp
 		CStack.cpp
 		CThreadHelper.cpp
@@ -156,6 +157,7 @@ set(lib_SRCS
 		NetPacksLib.cpp
 		StartInfo.cpp
 		ResourceSet.cpp
+		ScriptHandler.cpp
 		VCMIDirs.cpp
 		VCMI_Lib.cpp
 
@@ -188,6 +190,7 @@ set(lib_HEADERS
 		battle/CPlayerBattleCallback.h
 		battle/CUnitState.h
 		battle/Destination.h
+		battle/IBattleEventRealizer.h
 		battle/IBattleState.h
 		battle/IUnitInfo.h
 		battle/ReachabilityInfo.h
@@ -341,6 +344,8 @@ set(lib_HEADERS
 		NetPacks.h
 		NetPacksLobby.h
 		ResourceSet.h
+		ScriptHandler.h
+		ScriptingService.h
 		ScopeGuard.h
 		StartInfo.h
 		StringConstants.h

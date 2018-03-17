@@ -20,7 +20,8 @@
 #include "mapObjects/CObjectClassesHandler.h"
 #include "CArtHandler.h"
 #include "CCreatureHandler.h"
-#include "spells/CSpellHandler.h"
+#include "spells/SpellService.h"
+#include "spells/CSpellHandler.h" //todo: remove
 #include "CSkillHandler.h"
 #include "StringConstants.h"
 #include "CGeneralTextHandler.h"
@@ -71,6 +72,11 @@ const CCreature * CreatureID::toCreature() const
 	return VLC->creh->creatures.at(*this);
 }
 
+const Creature * CreatureID::toCreature(const CreatureService * creatureService) const
+{
+	return creatureService->getCreature(*this);
+}
+
 si32 CreatureID::decode(const std::string & identifier)
 {
 	auto rawId = VLC->modh->identifiers.getIdentifier("core", "creature", identifier);
@@ -95,6 +101,11 @@ const CSpell * SpellID::toSpell() const
 	return VLC->spellh->objects[*this];
 }
 
+const spells::Spell * SpellID::toSpell(const spells::SpellService * service) const
+{
+	return service->getSpell(*this);
+}
+
 si32 SpellID::decode(const std::string & identifier)
 {
 	auto rawId = VLC->modh->identifiers.getIdentifier("core", "spell", identifier);
@@ -108,14 +119,6 @@ std::string SpellID::encode(const si32 index)
 {
 	return VLC->spellh->objects.at(index)->identifier;
 }
-
-const CSkill * SecondarySkill::toSkill() const
-{
-	return VLC->skillh->objects.at(*this);
-}
-
-//template std::ostream & operator << <ArtifactInstanceID>(std::ostream & os, BaseForID<ArtifactInstanceID> id);
-//template std::ostream & operator << <ObjectInstanceID>(std::ostream & os, BaseForID<ObjectInstanceID> id);
 
 bool PlayerColor::isValidPlayer() const
 {

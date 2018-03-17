@@ -159,7 +159,7 @@ std::string CComponent::getDescription()
 		}
 		else
 		{
-			art.reset(CArtifactInstance::createScroll(static_cast<SpellID>(val)));
+			art.reset(CArtifactInstance::createScroll(SpellID(val)));
 		}
 		return art->getEffectiveDescription();
 	}

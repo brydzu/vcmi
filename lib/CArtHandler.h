@@ -9,11 +9,10 @@
  */
 #pragma once
 
-#include "../lib/HeroBonus.h"
-//#include "../lib/ConstTransitivePtr.h"
-//#include "JsonNode.h"
+#include "HeroBonus.h"
 #include "GameConstants.h"
 #include "IHandlerBase.h"
+#include "Artifact.h"
 
 class CArtHandler;
 class CArtifact;
@@ -40,7 +39,7 @@ namespace ArtBearer
 	};
 }
 
-class DLL_LINKAGE CArtifact : public CBonusSystemNode //container for artifacts
+class DLL_LINKAGE CArtifact : public Artifact, public CBonusSystemNode //container for artifacts
 {
 protected:
 	std::string name, description; //set if custom
@@ -171,7 +170,6 @@ public:
 		BONUS_TREE_DESERIALIZATION_FIX
 	}
 
-	static CArtifactInstance *createScroll(const CSpell *s);
 	static CArtifactInstance *createScroll(SpellID sid);
 	static CArtifactInstance *createNewArtifactInstance(CArtifact *Art);
 	static CArtifactInstance *createNewArtifactInstance(int aid);

@@ -987,25 +987,3 @@ bool CGameInfoCallback::isTeleportEntrancePassable(const CGTeleport * obj, Playe
 {
 	return obj && obj->isEntrance() && !isTeleportChannelImpassable(obj->channel, player);
 }
-
-void IGameEventRealizer::showInfoDialog( InfoWindow *iw )
-{
-	commitPackage(iw);
-}
-
-void IGameEventRealizer::showInfoDialog(const std::string &msg, PlayerColor player)
-{
-	InfoWindow iw;
-	iw.player = player;
-	iw.text << msg;
-	showInfoDialog(&iw);
-}
-
-void IGameEventRealizer::setObjProperty(ObjectInstanceID objid, int prop, si64 val)
-{
-	SetObjectProperty sob;
-	sob.id = objid;
-	sob.what = prop;
-	sob.val = static_cast<ui32>(val);
-	commitPackage(&sob);
-}

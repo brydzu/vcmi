@@ -64,7 +64,7 @@ bool Sacrifice::applicable(Problem & problem, const Mechanics * m) const
 	auto mainFilter = std::bind(&UnitEffect::getStackFilter, this, m, true, _1);
 	auto predicate = std::bind(&UnitEffect::eraseByImmunityFilter, this, m, _1);
 
-	auto targets = m->cb->battleGetUnitsIf(mainFilter);
+	auto targets = m->battle()->battleGetUnitsIf(mainFilter);
 	vstd::erase_if(targets, predicate);
 
 	bool targetExists = false;

@@ -51,7 +51,7 @@ void Clone::apply(BattleStateProxy * battleState, RNG & rng, const Mechanics * m
 		if(clonedStack->getCount() < 1)
 			continue;
 
-		auto hex = m->cb->getAvaliableHex(clonedStack->creatureId(), m->casterSide);
+		auto hex = m->battle()->getAvaliableHex(clonedStack->creatureId(), m->casterSide);
 
 		if(!hex.isValid())
 		{
@@ -59,7 +59,7 @@ void Clone::apply(BattleStateProxy * battleState, RNG & rng, const Mechanics * m
 			break;
 		}
 
-		auto unitId = m->cb->battleNextUnitId();
+		auto unitId = m->battle()->battleNextUnitId();
 
 		battle::UnitInfo info;
 		info.id = unitId;
@@ -78,7 +78,7 @@ void Clone::apply(BattleStateProxy * battleState, RNG & rng, const Mechanics * m
 
 		BattleUnitsChanged cloneFlags;
 
-		auto cloneUnit = m->cb->battleGetUnitByID(unitId);
+		auto cloneUnit = m->battle()->battleGetUnitByID(unitId);
 		auto cloneState = cloneUnit->acquireState();
 		cloneState->cloned = true;
 		cloneFlags.changedStacks.emplace_back(cloneState->unitId(), UnitChanges::EOperation::RESET_STATE);

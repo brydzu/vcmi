@@ -12,6 +12,7 @@
 #include "../CStack.h"
 #include "BattleInfo.h"
 #include "../NetPacks.h"
+#include "../ScriptingService.h"
 #include "../spells/CSpellHandler.h"
 #include "../mapObjects/CGTownInstance.h"
 
@@ -113,6 +114,11 @@ static BattleHex WallPartToHex(EWallPart::EWallPart part)
 }
 
 using namespace SiegeStuffThatShouldBeMovedToHandlers;
+
+std::shared_ptr<scripting::Context> CBattleInfoCallback::getScriptingContext(const scripting::Script * script) const
+{
+	return getContextPool()->getContext(script);
+}
 
 ESpellCastProblem::ESpellCastProblem CBattleInfoCallback::battleCanCastSpell(const spells::Caster * caster, spells::Mode mode) const
 {

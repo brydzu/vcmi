@@ -66,7 +66,7 @@ public:
 
 	void serializeJson(JsonSerializeFormat & handler);
 
-	static std::shared_ptr<Effect> create(const std::string & type);
+	static std::shared_ptr<Effect> create(const Registry * registry, const std::string & type);
 
 protected:
 	virtual void serializeJsonEffect(JsonSerializeFormat & handler) = 0;

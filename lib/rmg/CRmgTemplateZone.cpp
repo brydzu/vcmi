@@ -2301,7 +2301,7 @@ void CRmgTemplateZone::addAllPossibleObjects()
 					out.push_back(spell->id);
 				}
 			}
-			auto a = CArtifactInstance::createScroll(RandomGeneratorUtil::nextItem(out, gen->rand)->toSpell());
+			auto a = CArtifactInstance::createScroll(*RandomGeneratorUtil::nextItem(out, gen->rand));
 			obj->storedArtifact = a;
 			return obj;
 		};

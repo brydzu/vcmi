@@ -31,6 +31,7 @@ protected:
 	void SetUp() override
 	{
 		EffectFixture::setUp();
+		setupEffect(JsonNode());
 	}
 };
 
@@ -46,6 +47,7 @@ protected:
 	void SetUp() override
 	{
 		EffectFixture::setUp();
+		setupEffect(JsonNode());
 	}
 };
 
@@ -60,6 +62,8 @@ TEST_F(TeleportApplyTest, MovesUnit)
 	EXPECT_CALL(unit, unitId()).Times(AtLeast(1)).WillRepeatedly(Return(unitId));
 
 	EXPECT_CALL(*battleFake, moveUnit(Eq(unitId), Eq(destination)));
+
+	EXPECT_CALL(mechanicsMock, getEffectLevel()).WillRepeatedly(Return(0));
 
 	Target target;
 	target.emplace_back(&unit, BattleHex());

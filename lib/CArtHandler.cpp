@@ -750,11 +750,6 @@ std::string CArtifactInstance::nodeName() const
 	return "Artifact instance of " + (artType ? artType->Name() : std::string("uninitialized")) + " type";
 }
 
-CArtifactInstance * CArtifactInstance::createScroll( const CSpell *s)
-{
-	return createScroll(s->id);
-}
-
 CArtifactInstance *CArtifactInstance::createScroll(SpellID sid)
 {
 	auto ret = new CArtifactInstance(VLC->arth->artifacts[ArtifactID::SPELL_SCROLL]);
@@ -960,7 +955,7 @@ CArtifactInstance * CArtifactInstance::createArtifact(CMap * map, int aid, int s
 		}
 		else
 		{
-			a = CArtifactInstance::createScroll(SpellID(spellID).toSpell());
+			a = CArtifactInstance::createScroll(SpellID(spellID));
 		}
 	}
 	else //FIXME: create combined artifact instance for random combined artifacts, just in case

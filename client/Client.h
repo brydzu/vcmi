@@ -28,7 +28,6 @@ class CGameInterface;
 class CCallback;
 struct BattleAction;
 class CClient;
-class CScriptingModule;
 struct CPathsInfo;
 class BinaryDeserializer;
 class BinarySerializer;
@@ -36,6 +35,12 @@ namespace boost { class thread; }
 
 template<typename T> class CApplier;
 class CBaseForCLApply;
+
+namespace scripting
+{
+	class PoolImpl;
+}
+
 
 template<typename T>
 class ThreadSafeVector
@@ -106,9 +111,8 @@ class CClient : public IGameCallback
 
 public:
 	std::map<PlayerColor, std::shared_ptr<CCallback>> callbacks; //callbacks given to player interfaces
-	std::map<PlayerColor, std::shared_ptr<CBattleCallback>> battleCallbacks; //callbacks given to player interfaces
-	std::vector<std::shared_ptr<IGameEventsReceiver>> privilegedGameEventReceivers; //scripting modules, spectator interfaces
-	std::vector<std::shared_ptr<IBattleEventsReceiver>> privilegedBattleEventReceivers; //scripting modules, spectator interfaces
+	std::vector<std::shared_ptr<IGameEventsReceiver>> privilegedGameEventReceivers; //scripting modules(?), spectator interfaces
+	std::vector<std::shared_ptr<IBattleEventsReceiver>> privilegedBattleEventReceivers; //scripting modules(?), spectator interfaces
 	std::map<PlayerColor, std::shared_ptr<CGameInterface>> playerint;
 	std::map<PlayerColor, std::shared_ptr<CBattleGameInterface>> battleints;
 
@@ -117,7 +121,6 @@ public:
 
 	boost::optional<BattleAction> curbaction;
 
-	CScriptingModule * erm;
 	CClient();
 
 	void newGame();
@@ -208,4 +211,11 @@ public:
 
 	void changeFogOfWar(int3 center, ui32 radius, PlayerColor player, bool hide) override {}
 	void changeFogOfWar(std::unordered_set<int3, ShashInt3> & tiles, PlayerColor player, bool hide) override {}
+
+	scripting::Pool * getGlobalContextPool() const override;
+private:
+	std::map<PlayerColor, std::shared_ptr<CBattleCallback>> battleCallbacks; //callbacks given to player interfaces
+
+	std::shared_ptr<CBattleCallback> scriptsBattleCallback;
+	std::shared_ptr<scripting::PoolImpl> clientScripts;
 };

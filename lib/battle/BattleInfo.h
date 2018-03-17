@@ -137,6 +137,9 @@ public:
 
 	static BattlefieldBI::BattlefieldBI battlefieldTypeToBI(BFieldType bfieldType); //converts above to ERM BI format
 	static int battlefieldTypeToTerrain(int bfieldType); //converts above to ERM BI format
+
+protected:
+	scripting::Pool * getContextPool() const override;
 };
 
 

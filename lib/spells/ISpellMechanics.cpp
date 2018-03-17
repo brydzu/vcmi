@@ -30,12 +30,15 @@
 #include "BattleSpellMechanics.h"
 
 #include "effects/Effects.h"
+#include "effects/Registry.h"
 #include "effects/Damage.h"
 #include "effects/Timed.h"
 
 #include "CSpellHandler.h"
+#include "../NetPacks.h"
 
 #include "../CHeroHandler.h"//todo: remove
+#include "../IGameCallback.h"//todo: remove
 
 namespace spells
 {
@@ -70,7 +73,7 @@ protected:
 	void loadEffects(const JsonNode & config, const int level)
 	{
 		JsonDeserializer deser(nullptr, config);
-		effects->serializeJson(deser, level);
+		effects->serializeJson(VLC->spellEffects(), deser, level);
 	}
 private:
 	std::shared_ptr<TargetCondition> targetCondition;
@@ -152,10 +155,40 @@ void BattleStateProxy::complain(const std::string & problem) const
 		logGlobal->error(problem);
 }
 
+void BattleStateProxy::apply(BattleStackMoved * pack)
+{
+	applyAny(pack);
+}
 
-BattleCast::BattleCast(const CBattleInfoCallback * cb, const Caster * caster_, const Mode mode_, const CSpell * spell_)
+void BattleStateProxy::apply(BattleUnitsChanged * pack)
+{
+	applyAny(pack);
+}
+
+void BattleStateProxy::apply(SetStackEffect * pack)
+{
+	applyAny(pack);
+}
+
+void BattleStateProxy::apply(StacksInjured * pack)
+{
+	applyAny(pack);
+}
+
+void BattleStateProxy::apply(BattleObstaclesChanged * pack)
+{
+	applyAny(pack);
+}
+
+void BattleStateProxy::apply(CatapultAttack * pack)
+{
+	applyAny(pack);
+}
+
+
+BattleCast::BattleCast(const CBattleInfoCallback * cb_, const Caster * caster_, const Mode mode_, const CSpell * spell_)
 	: spell(spell_),
-	cb(cb),
+	cb(cb_),
 	caster(caster_),
 	mode(mode_),
 	magicSkillLevel(),
@@ -165,12 +198,13 @@ BattleCast::BattleCast(const CBattleInfoCallback * cb, const Caster * caster_, c
 	smart(boost::logic::indeterminate),
 	massive(boost::logic::indeterminate)
 {
-
+	gameCb = IObjectInterface::cb; //FIXME: pass player callback (problem is that BattleAI do have one)
 }
 
 BattleCast::BattleCast(const BattleCast & orig, const Caster * caster_)
 	: spell(orig.spell),
 	cb(orig.cb),
+	gameCb(orig.gameCb),
 	caster(caster_),
 	mode(Mode::MAGIC_MIRROR),
 	magicSkillLevel(orig.magicSkillLevel),
@@ -202,6 +236,11 @@ const Caster * BattleCast::getCaster() const
 const CBattleInfoCallback * BattleCast::getBattle() const
 {
 	return cb;
+}
+
+const IGameInfoCallback * BattleCast::getGame() const
+{
+	return gameCb;
 }
 
 BattleCast::OptionalValue BattleCast::getSpellLevel() const
@@ -254,20 +293,7 @@ void BattleCast::setEffectValue(BattleCast::Value64 value)
 	effectValue = boost::make_optional(value);
 }
 
-void BattleCast::aimToHex(const BattleHex & destination)
-{
-	target.push_back(Destination(destination));
-}
-
-void BattleCast::aimToUnit(const battle::Unit * destination)
-{
-	if(nullptr == destination)
-		logGlobal->error("BattleCast::aimToUnit: invalid unit.");
-	else
-		target.push_back(Destination(destination));
-}
-
-void BattleCast::applyEffects(const SpellCastEnvironment * env, bool indirect, bool ignoreImmunity) const
+void BattleCast::applyEffects(const SpellCastEnvironment * env, Target target,  bool indirect, bool ignoreImmunity) const
 {
 	auto m = spell->battleMechanics(this);
 
@@ -276,10 +302,11 @@ void BattleCast::applyEffects(const SpellCastEnvironment * env, bool indirect, b
 	m->applyEffects(&proxy, env->getRandomGenerator(), target, indirect, ignoreImmunity);
 }
 
-void BattleCast::cast(const SpellCastEnvironment * env)
+void BattleCast::cast(const SpellCastEnvironment * env, Target target)
 {
 	if(target.empty())
-		aimToHex(BattleHex::INVALID);
+		target.emplace_back();
+
 	auto m = spell->battleMechanics(this);
 
 	const battle::Unit * mainTarget = nullptr;
@@ -319,21 +346,23 @@ void BattleCast::cast(const SpellCastEnvironment * env)
 
 			if(!mirrorTargets.empty())
 			{
-				auto mirrorTarget = (*RandomGeneratorUtil::nextItem(mirrorTargets, env->getRandomGenerator()));
+				auto mirrorDesination = (*RandomGeneratorUtil::nextItem(mirrorTargets, env->getRandomGenerator()));
+
+				Target mirrorTarget;
+				mirrorTarget.emplace_back(mirrorDesination);
 
 				BattleCast mirror(*this, mainTarget);
-				mirror.aimToUnit(mirrorTarget);
-				mirror.cast(env);
+				mirror.cast(env, mirrorTarget);
 			}
 		}
 	}
 }
 
-void BattleCast::cast(IBattleState * battleState, vstd::RNG & rng)
+void BattleCast::cast(IBattleState * battleState, vstd::RNG & rng, Target target)
 {
 	//TODO: make equivalent to normal cast
 	if(target.empty())
-		aimToHex(BattleHex::INVALID);
+		target.emplace_back();
 	auto m = spell->battleMechanics(this);
 
 	//TODO: reflection
@@ -342,11 +371,11 @@ void BattleCast::cast(IBattleState * battleState, vstd::RNG & rng)
 	m->cast(battleState, rng, target);
 }
 
-bool BattleCast::castIfPossible(const SpellCastEnvironment * env)
+bool BattleCast::castIfPossible(const SpellCastEnvironment * env, Target target)
 {
 	if(spell->canBeCast(cb, mode, caster))
 	{
-		cast(env);
+		cast(env, target);
 		return true;
 	}
 	return false;
@@ -433,8 +462,7 @@ std::unique_ptr<ISpellMechanicsFactory> ISpellMechanicsFactory::get(const CSpell
 
 ///Mechanics
 Mechanics::Mechanics()
-	: cb(nullptr),
-	caster(nullptr),
+	: caster(nullptr),
 	casterSide(0)
 {
 
@@ -450,6 +478,8 @@ BaseMechanics::BaseMechanics(const IBattleCast * event)
 	massive(event->isMassive())
 {
 	cb = event->getBattle();
+	gameCb = event->getGame();
+
 	caster = event->getCaster();
 
 	//FIXME: do not crash on invalid side
@@ -736,6 +766,32 @@ std::vector<AimType> BaseMechanics::getTargetTypes() const
 
 	return ret;
 }
+
+const CreatureService * BaseMechanics::creatureService() const
+{
+	return VLC->creatureService(); //todo: redirect
+}
+
+const scripting::Service * BaseMechanics::scriptingService() const
+{
+	return VLC->scriptingService(); //todo: redirect
+}
+
+const SpellService * BaseMechanics::spellService() const
+{
+	return VLC->spellService(); //todo: redirect
+}
+
+const IGameInfoCallback * BaseMechanics::game() const
+{
+	return gameCb;
+}
+
+const CBattleInfoCallback * BaseMechanics::battle() const
+{
+	return cb;
+}
+
 
 } //namespace spells
 

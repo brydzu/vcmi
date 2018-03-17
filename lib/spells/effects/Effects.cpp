@@ -128,7 +128,7 @@ Effects::EffectsToApply Effects::prepare(const Mechanics * m, const Target & aim
 	return effectsToApply;
 }
 
-void Effects::serializeJson(JsonSerializeFormat & handler, const int level)
+void Effects::serializeJson(const Registry * registry, JsonSerializeFormat & handler, const int level)
 {
 	assert(!handler.saving);
 
@@ -143,7 +143,7 @@ void Effects::serializeJson(JsonSerializeFormat & handler, const int level)
 		std::string type;
 		handler.serializeString("type", type);
 
-		auto effect = Effect::create(type);
+		auto effect = Effect::create(registry, type);
 		if(effect)
 		{
 			effect->serializeJson(handler);

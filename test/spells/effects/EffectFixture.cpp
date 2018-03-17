@@ -20,12 +20,22 @@ bool battle::operator==(const Destination& left, const Destination& right)
 	return left.unitValue == right.unitValue && left.hexValue == right.hexValue;
 }
 
+bool operator==(const Bonus & b1, const Bonus & b2)
+{
+	return b1.duration == b2.duration
+		&& b1.type == b2.type
+		&& b1.subtype == b2.subtype
+		&& b1.source == b2.source
+		&& b1.val == b2.val
+		&& b1.sid == b2.sid
+		&& b1.valType == b2.valType
+		&& b1.additionalInfo == b2.additionalInfo
+		&& b1.effectRange == b2.effectRange
+		&& b1.description == b2.description;
+}
+
 namespace test
 {
-
-using namespace ::spells;
-using namespace ::spells::effects;
-using namespace ::testing;
 
 void EffectFixture::UnitFake::addNewBonus(const std::shared_ptr<Bonus> & b)
 {
@@ -77,9 +87,10 @@ battle::Units EffectFixture::UnitsFake::getUnitsIf(battle::UnitFilter predicate)
 	return ret;
 }
 
-EffectFixture::BattleFake::BattleFake()
+EffectFixture::BattleFake::BattleFake(std::shared_ptr<PoolMock> pool_)
 	: CBattleInfoCallback(),
-	BattleStateMock()
+	BattleStateMock(),
+	pool(pool_)
 {
 }
 
@@ -87,6 +98,12 @@ void EffectFixture::BattleFake::setUp()
 {
 	CBattleInfoCallback::setBattle(this);
 }
+
+Pool * EffectFixture::BattleFake::getContextPool() const
+{
+	return pool.get();
+}
+
 
 void EffectFixture::UnitsFake::setDefaultBonusExpectations()
 {
@@ -110,22 +127,41 @@ EffectFixture::~EffectFixture() = default;
 
 void EffectFixture::setupEffect(const JsonNode & effectConfig)
 {
+	subject = Effect::create(GlobalRegistry::get(), effectName);
+	ASSERT_TRUE(subject);
+
 	JsonDeserializer deser(nullptr, effectConfig);
 	subject->serializeJson(deser);
 }
 
+void EffectFixture::setupEffect(Registry * registry, const JsonNode & effectConfig)
+{
+	subject = Effect::create(registry, effectName);
+	ASSERT_TRUE(subject);
+
+	JsonDeserializer deser(nullptr, effectConfig);
+	subject->serializeJson(deser);
+}
+
+
 void EffectFixture::setUp()
 {
-	subject = Effect::create(effectName);
-	ASSERT_TRUE(subject);
-	battleFake = std::make_shared<BattleFake>();
+	pool = std::make_shared<PoolMock>();
+
+	battleFake = std::make_shared<BattleFake>(pool);
 	battleFake->setUp();
 
-	mechanicsMock.cb = battleFake.get();
+	EXPECT_CALL(mechanicsMock, game()).WillRepeatedly(Return(&gameMock));
+	EXPECT_CALL(mechanicsMock, battle()).WillRepeatedly(Return(battleFake.get()));
 
 	battleProxy = std::make_shared<BattleStateProxy>(battleFake.get());
 
 	ON_CALL(*battleFake, getUnitsIf(_)).WillByDefault(Invoke(&unitsFake, &UnitsFake::getUnitsIf));
+	ON_CALL(mechanicsMock, spellService()).WillByDefault(Return(&spellServiceMock));
+	ON_CALL(spellServiceMock, getSpell(_)).WillByDefault(Return(&spellStub));
+
+	ON_CALL(mechanicsMock, creatureService()).WillByDefault(Return(&creatureServiceMock));
+	ON_CALL(creatureServiceMock, getCreature(_)).WillByDefault(Return(&creatureStub));
 }
 
 static vstd::TRandI64 getInt64RangeDef(int64_t lower, int64_t upper)

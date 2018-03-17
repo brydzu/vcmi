@@ -157,14 +157,56 @@ void BattleSpellMechanics::applyEffects(BattleStateProxy * battleState, vstd::RN
 
 bool BattleSpellMechanics::canBeCast(Problem & problem) const
 {
+	auto genProblem = battle()->battleCanCastSpell(caster, mode);
+	if(genProblem != ESpellCastProblem::OK)
+		return adaptProblem(genProblem, problem);
+
+	switch(mode)
+	{
+	case Mode::HERO:
+		{
+			const CGHeroInstance * castingHero = dynamic_cast<const CGHeroInstance *>(caster);//todo: unify hero|creature spell cost
+			if(!castingHero)
+			{
+				logGlobal->debug("CSpell::canBeCast: invalid caster");
+				genProblem = ESpellCastProblem::NO_HERO_TO_CAST_SPELL;
+			}
+			else if(!castingHero->getArt(ArtifactPosition::SPELLBOOK))
+				genProblem = ESpellCastProblem::NO_SPELLBOOK;
+			else if(!castingHero->canCastThisSpell(owner))
+				genProblem = ESpellCastProblem::HERO_DOESNT_KNOW_SPELL;
+			else if(castingHero->mana < battle()->battleGetSpellCost(owner, castingHero)) //not enough mana
+				genProblem = ESpellCastProblem::NOT_ENOUGH_MANA;
+		}
+		break;
+	}
+
+	if(genProblem != ESpellCastProblem::OK)
+		return adaptProblem(genProblem, problem);
+
+	if(!owner->isCombatSpell())
+		return adaptProblem(ESpellCastProblem::ADVMAP_SPELL_INSTEAD_OF_BATTLE_SPELL, problem);
+
+	const PlayerColor player = caster->getOwner();
+	const auto side = battle()->playerToSide(player);
+
+	if(!side)
+		return adaptProblem(ESpellCastProblem::INVALID, problem);
+
+	//effect like Recanter's Cloak. Blocks also passive casting.
+	//TODO: check creature abilities to block
+	//TODO: check any possible caster
+
+	if(battle()->battleMaxSpellLevel(side.get()) < getSpellLevel() || battle()->battleMinSpellLevel(side.get()) > getSpellLevel())
+		return adaptProblem(ESpellCastProblem::SPELL_LEVEL_LIMIT_EXCEEDED, problem);
+
 	return effects->applicable(problem, this);
 }
 
-bool BattleSpellMechanics::canBeCastAt(const Target & target) const
+bool BattleSpellMechanics::canBeCastAt(Problem & problem, const Target & target) const
 {
-	detail::ProblemImpl problem;
-
-	//TODO: send problem to caller (for battle log message in BattleInterface)
+	if(!canBeCast(problem))
+		return false;
 
 	Target spellTarget = transformSpellTarget(target);
 
@@ -190,7 +232,7 @@ std::vector<const CStack *> BattleSpellMechanics::getAffectedStacks(const Target
 		if(dest.unitValue)
 		{
 			//FIXME: remove and return battle::Unit
-			stacks.insert(cb->battleGetStackByID(dest.unitValue->unitId(), false));
+			stacks.insert(battle()->battleGetStackByID(dest.unitValue->unitId(), false));
 		}
 	}
 
@@ -219,22 +261,22 @@ void BattleSpellMechanics::cast(const PacketSender * server, vstd::RNG & rng, co
 	const CGHeroInstance * otherHero = nullptr;
 	{
 		//check it there is opponent hero
-		const ui8 otherSide = cb->otherSide(casterSide);
+		const ui8 otherSide = battle()->otherSide(casterSide);
 
-		if(cb->battleHasHero(otherSide))
-			otherHero = cb->battleGetFightingHero(otherSide);
+		if(battle()->battleHasHero(otherSide))
+			otherHero = battle()->battleGetFightingHero(otherSide);
 	}
 
 	//calculate spell cost
 	if(mode == Mode::HERO)
 	{
 		auto casterHero = dynamic_cast<const CGHeroInstance *>(caster);
-		spellCost = cb->battleGetSpellCost(owner, casterHero);
+		spellCost = battle()->battleGetSpellCost(owner, casterHero);
 
 		if(nullptr != otherHero) //handle mana channel
 		{
 			int manaChannel = 0;
-			for(const CStack * stack : cb->battleGetAllStacks(true)) //TODO: shouldn't bonus system handle it somehow?
+			for(const CStack * stack : battle()->battleGetAllStacks(true)) //TODO: shouldn't bonus system handle it somehow?
 			{
 				if(stack->owner == otherHero->tempOwner)
 				{
@@ -583,7 +625,9 @@ std::vector<Destination> BattleSpellMechanics::getPossibleDestinations(size_t in
 				Target tmp = current;
 				tmp.emplace_back(dest);
 
-				if(canBeCastAt(tmp))
+				detail::ProblemImpl ingored;
+
+				if(canBeCastAt(ingored, tmp))
 					ret.emplace_back(dest);
 			}
 		}

@@ -10,6 +10,9 @@
 
 #pragma once
 
+#include "Spell.h"
+#include "SpellService.h"
+
 /**
  * High-level interface for spells subsystem
  */
@@ -34,8 +37,6 @@ class BattleCast;
 using Destination = ::battle::Destination;
 
 using Target = std::vector<Destination>;
-
-struct SchoolInfo;
 
 enum class Mode
 {
@@ -81,18 +82,6 @@ public:
 	virtual void add(MetaString && description, Severity severity = CRITICAL) = 0;
 
 	virtual void getAll(std::vector<std::string> & target) const = 0;
-};
-
-class DLL_LINKAGE Spell
-{
-public:
-	virtual ~Spell() = default;
-
-	virtual int32_t getIndex() const = 0;
-
-	virtual int32_t getLevel() const = 0;
-
-	virtual void forEachSchool(const std::function<void (const SchoolInfo &, bool &)> & cb) const = 0;
 };
 
 class DLL_LINKAGE Caster

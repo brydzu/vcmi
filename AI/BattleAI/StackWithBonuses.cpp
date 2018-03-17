@@ -12,6 +12,8 @@
 #include "../../lib/NetPacksBase.h"
 #include "../../lib/CStack.h"
 
+using scripting::Pool;
+
 void actualizeEffect(TBonusListPtr target, const Bonus & ef)
 {
 	for(auto bonus : *target) //TODO: optimize
@@ -390,3 +392,9 @@ int64_t HypotheticBattle::getTreeVersion() const
 {
 	return getBattleNode()->getTreeVersion() + bonusTreeVersion;
 }
+
+Pool * HypotheticBattle::getContextPool() const
+{
+	return pool;
+}
+

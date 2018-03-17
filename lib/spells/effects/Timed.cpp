@@ -145,11 +145,10 @@ void Timed::describeEffect(std::vector<MetaString> & log, const Mechanics * m, c
 
 void Timed::prepareEffects(SetStackEffect & sse, const Mechanics * m, const EffectTarget & target, bool describe) const
 {
-	//get default spell duration (spell power with bonuses for heroes)
 	int32_t duration = m->getEffectDuration();
 
 	std::vector<Bonus> converted;
-    convertBonus(m, duration, converted);
+	convertBonus(m, duration, converted);
 
 	std::shared_ptr<Bonus> bonus = nullptr;
 	auto casterHero = dynamic_cast<const CGHeroInstance *>(m->caster);
@@ -225,7 +224,7 @@ void Timed::prepareEffects(SetStackEffect & sse, const Mechanics * m, const Effe
 			buffer.push_back(specialBonus);
 		}
 
-        if(cumulative)
+		if(cumulative)
 			sse.toAdd.push_back(std::make_pair(affected->unitId(), buffer));
 		else
 			sse.toUpdate.push_back(std::make_pair(affected->unitId(), buffer));

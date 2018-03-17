@@ -154,7 +154,7 @@ bool Obstacle::applicable(Problem & problem, const Mechanics * m, const EffectTa
 				for(auto direction : trasformation)
 					hex.moveInDirection(direction, false);
 
-				if(!isHexAvailable(m->cb, hex, requiresClearTiles))
+				if(!isHexAvailable(m->battle(), hex, requiresClearTiles))
 					return noRoomToPlace(problem, m);
 			}
 		}
@@ -196,7 +196,7 @@ void Obstacle::apply(BattleStateProxy * battleState, RNG & rng, const Mechanics 
 		for(int i = 0; i < GameConstants::BFIELD_SIZE; i++)
 		{
 			BattleHex hex = i;
-			if(isHexAvailable(m->cb, hex, true))
+			if(isHexAvailable(m->battle(), hex, true))
 				availableTiles.push_back(hex);
 		}
 		RandomGeneratorUtil::randomShuffle(availableTiles, rng);
@@ -280,7 +280,7 @@ void Obstacle::placeObstacles(BattleStateProxy * battleState, const Mechanics * 
 
 	BattleObstaclesChanged pack;
 
-	auto all = m->cb->battleGetAllObstacles(BattlePerspective::ALL_KNOWING);
+	auto all = m->battle()->battleGetAllObstacles(BattlePerspective::ALL_KNOWING);
 
 	int obstacleIdToGive = 1;
 	for(auto & one : all)

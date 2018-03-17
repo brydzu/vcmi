@@ -35,6 +35,7 @@ protected:
 	void SetUp() override
 	{
 		EffectFixture::setUp();
+		EffectFixture::setupEffect(JsonNode());
 	}
 };
 
@@ -86,6 +87,7 @@ protected:
 
 TEST_F(DamageApplyTest, DoesDamageToAliveUnit)
 {
+	EffectFixture::setupEffect(JsonNode());
 	using namespace ::battle;
 
 	const int64_t effectValue = 123;
@@ -121,6 +123,7 @@ TEST_F(DamageApplyTest, DoesDamageToAliveUnit)
 
 TEST_F(DamageApplyTest, IgnoresDeadUnit)
 {
+	EffectFixture::setupEffect(JsonNode());
 	using namespace ::battle;
 
 	auto & targetUnit = unitsFake.add(BattleSide::ATTACKER);

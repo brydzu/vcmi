@@ -41,6 +41,7 @@ protected:
 
 TEST_F(HealTest, NotApplicableToHealthyUnit)
 {
+	EffectFixture::setupEffect(JsonNode());
 	auto & unit = unitsFake.add(BattleSide::ATTACKER);
 
 	EXPECT_CALL(unit, isValidTarget(Eq(false))).WillOnce(Return(true));
@@ -58,6 +59,7 @@ TEST_F(HealTest, NotApplicableToHealthyUnit)
 
 TEST_F(HealTest, ApplicableToWoundedUnit)
 {
+	EffectFixture::setupEffect(JsonNode());
 	auto & unit = unitsFake.add(BattleSide::ATTACKER);
 	unit.makeAlive();
 	EXPECT_CALL(unit, isValidTarget(Eq(false))).WillOnce(Return(true));

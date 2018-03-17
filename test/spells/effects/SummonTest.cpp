@@ -142,26 +142,34 @@ INSTANTIATE_TEST_CASE_P
 class SummonApplyTest : public TestWithParam<::testing::tuple<bool, bool>>, public EffectFixture
 {
 public:
-	CreatureID toSummon;
+	const CreatureID toSummon = CreatureID::AIR_ELEMENTAL;
 	bool permanent = false;
 	bool summonByHealth = false;
 
 	const uint32_t unitId = 42;
 	const int32_t unitAmount = 123;
-	const int32_t unitHealth;
-	const int64_t unitTotalHealth;
+	const int32_t unitHealth = 479;
+	const int64_t unitTotalHealth = unitAmount * unitHealth;
 
 	const BattleHex unitPosition = BattleHex(5,5);
 
 	std::shared_ptr<::battle::UnitInfo> unitAddInfo;
 	std::shared_ptr<UnitFake> acquired;
 
+	StrictMock<CreatureMock> toSummonType;
+
 	SummonApplyTest()
-		: EffectFixture("core:summon"),
-		toSummon(creature1),
-		unitHealth(toSummon.toCreature()->MaxHealth()),
-		unitTotalHealth(unitAmount * unitHealth)
+		: EffectFixture("core:summon")
 	{
+	}
+
+	void setDefaultExpectaions()
+	{
+		EXPECT_CALL(mechanicsMock, creatureService()).Times(AnyNumber());
+		EXPECT_CALL(creatureServiceMock, getCreature(Eq(toSummon))).WillRepeatedly(Return(&toSummonType));
+		EXPECT_CALL(toSummonType, getMaxHealth()).WillRepeatedly(Return(unitHealth));
+
+		expectAmountCalculation();
 	}
 
 	void expectAmountCalculation()
@@ -212,7 +220,7 @@ protected:
 
 TEST_P(SummonApplyTest, SpawnsNewUnit)
 {
-	expectAmountCalculation();
+	setDefaultExpectaions();
 
 	EXPECT_CALL(*battleFake, nextUnitId()).WillOnce(Return(unitId));
 	EXPECT_CALL(*battleFake, addUnit(Eq(unitId), _)).WillOnce(Invoke(this, &SummonApplyTest::onUnitAdded));
@@ -232,7 +240,7 @@ TEST_P(SummonApplyTest, SpawnsNewUnit)
 
 TEST_P(SummonApplyTest, UpdatesOldUnit)
 {
-	expectAmountCalculation();
+	setDefaultExpectaions();
 
 	acquired = std::make_shared<UnitFake>();
 	acquired->addNewBonus(std::make_shared<Bonus>(Bonus::PERMANENT, Bonus::STACK_HEALTH, Bonus::CREATURE_ABILITY, unitHealth, 0));

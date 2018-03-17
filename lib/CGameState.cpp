@@ -1488,7 +1488,7 @@ void CGameState::giveCampaignBonusToHero(CGHeroInstance * hero)
 			break;
 		case CScenarioTravel::STravelBonus::SPELL_SCROLL:
 			{
-				CArtifactInstance * scroll = CArtifactInstance::createScroll(SpellID(curBonus->info2).toSpell());
+				CArtifactInstance * scroll = CArtifactInstance::createScroll(SpellID(curBonus->info2));
 				scroll->putAt(ArtifactLocation(hero, scroll->firstAvailableSlot(hero)));
 			}
 			break;

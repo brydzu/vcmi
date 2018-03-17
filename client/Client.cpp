@@ -44,11 +44,11 @@
 #include "lobby/CBonusSelection.h"
 #include "battle/CBattleInterface.h"
 #include "../lib/CThreadHelper.h"
-#include "../lib/CScriptingModule.h"
 #include "../lib/registerTypes/RegisterTypes.h"
 #include "gui/CGuiHandler.h"
 #include "CMT.h"
 #include "CServerHandler.h"
+#include "../lib/ScriptHandler.h"
 
 #ifdef VCMI_ANDROID
 #include "lib/CAndroidVMHelper.h"
@@ -115,7 +115,6 @@ CClient::CClient()
 	registerTypesClientPacks2(*applier);
 	IObjectInterface::cb = this;
 	gs = nullptr;
-	erm = nullptr;
 }
 
 void CClient::newGame()
@@ -128,6 +127,10 @@ void CClient::newGame()
 	logNetwork->trace("Initializing GameState (together): %d ms", CSH->th->getDiff());
 
 	initMapHandler();
+
+	scriptsBattleCallback.reset(new CBattleCallback(boost::none, this));
+	clientScripts.reset(new scripting::PoolImpl(this, scriptsBattleCallback.get()));
+
 	initPlayerInterfaces();
 }
 
@@ -173,6 +176,10 @@ void CClient::loadGame()
 	gs->updateOnLoad(CSH->si.get());
 	initMapHandler();
 	serialize(loader->serializer, loader->serializer.fileVersion);
+
+	scriptsBattleCallback.reset(new CBattleCallback(boost::none, this));
+	clientScripts.reset(new scripting::PoolImpl(this, scriptsBattleCallback.get()));
+
 	initPlayerInterfaces();
 }
 
@@ -190,6 +197,13 @@ void CClient::serialize(BinarySerializer & h, const int version)
 		h & i->second->dllName;
 		h & i->second->human;
 		i->second->saveGame(h, version);
+	}
+
+	if(version >= 790)
+	{
+		//TODO: save scripts state
+		JsonNode scriptsState;
+		h & scriptsState;
 	}
 }
 
@@ -254,6 +268,14 @@ void CClient::serialize(BinaryDeserializer & h, const int version)
 		}
 		nInt.reset();
 	}
+
+	if(version >= 790)
+	{
+		//TODO: load scripts state
+		JsonNode scriptsState;
+		h & scriptsState;
+	}
+
 	logNetwork->trace("Loaded client part of save %d ms", CSH->th->getDiff());
 }
 
@@ -271,6 +293,9 @@ void CClient::save(const std::string & fname)
 
 void CClient::endGame()
 {
+	clientScripts.reset();
+	scriptsBattleCallback.reset();
+
 	//suggest interfaces to finish their stuff (AI should interrupt any bg working threads)
 	for(auto & i : playerint)
 		i.second->finish();
@@ -464,6 +489,7 @@ int CClient::sendRequest(const CPackForServer * request, PlayerColor player)
 
 void CClient::battleStarted(const BattleInfo * info)
 {
+	scriptsBattleCallback->setBattle(info);
 	for(auto & battleCb : battleCallbacks)
 	{
 		if(vstd::contains_if(info->sides, [&](const SideInBattle& side) {return side.color == battleCb.first; })
@@ -559,6 +585,8 @@ void CClient::battleFinished()
 
 	if(settings["session"]["spectate"].Bool() && !settings["session"]["spectate-skip-battle"].Bool())
 		battleCallbacks[PlayerColor::SPECTATOR]->setBattle(nullptr);
+
+	scriptsBattleCallback->setBattle(nullptr);
 }
 
 void CClient::startPlayerBattleAction(PlayerColor color)
@@ -641,6 +669,12 @@ PlayerColor CClient::getLocalPlayer() const
 		return LOCPLINT->playerID;
 	return getCurrentPlayer();
 }
+
+scripting::Pool * CClient::getGlobalContextPool() const
+{
+	return clientScripts.get();
+}
+
 
 #ifdef VCMI_ANDROID
 extern "C" JNIEXPORT void JNICALL Java_eu_vcmi_vcmi_NativeMethods_notifyServerReady(JNIEnv * env, jobject cls)

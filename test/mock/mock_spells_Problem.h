@@ -11,6 +11,7 @@
 #pragma once
 
 #include "../../lib/spells/Magic.h"
+#include "../../lib/NetPacksBase.h"
 
 namespace spells
 {
@@ -22,9 +23,13 @@ public:
 	{
 		//TODO: do something with description
 		add(severity);
+
+		log.push_back(description.toString());
 	}
 	MOCK_METHOD1(add, void(Severity));
 	MOCK_CONST_METHOD1(getAll, void(std::vector<std::string> &));
+
+	std::vector<std::string> log;
 };
 
 }

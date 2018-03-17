@@ -11,14 +11,22 @@
 #pragma once
 
 #include "../../../lib/spells/effects/Effect.h"
+#include "../../../lib/spells/effects/Registry.h"
 
-#include "mock/mock_spells_Mechanics.h"
-#include "mock/mock_spells_Problem.h"
+#include "../../mock/mock_spells_Mechanics.h"
+#include "../../mock/mock_spells_Problem.h"
+#include "../../mock/mock_spells_Spell.h"
+#include "../../mock/mock_spells_SpellService.h"
+#include "../../mock/mock_IGameInfoCallback.h"
 
-#include "mock/mock_BonusBearer.h"
-#include "mock/mock_battle_IBattleState.h"
-#include "mock/mock_battle_Unit.h"
-#include "mock/mock_vstd_RNG.h"
+#include "../../mock/mock_Creature.h"
+#include "../../mock/mock_CreatureService.h"
+
+#include "../../mock/mock_BonusBearer.h"
+#include "../../mock/mock_battle_IBattleState.h"
+#include "../../mock/mock_battle_Unit.h"
+#include "../../mock/mock_vstd_RNG.h"
+#include "../../mock/mock_scripting_Pool.h"
 
 
 #include "../../../lib/JsonNode.h"
@@ -30,13 +38,19 @@ namespace battle
 	bool operator== (const Destination & left, const Destination & right);
 }
 
+bool operator==(const Bonus & b1, const Bonus & b2);
+
 namespace test
 {
+
+using namespace ::testing;
+using namespace ::spells;
+using namespace ::spells::effects;
+using namespace ::scripting;
 
 class EffectFixture
 {
 public:
-
 	class UnitFake : public UnitMock
 	{
 	public:
@@ -67,21 +81,31 @@ public:
 
 	class BattleFake : public CBattleInfoCallback, public BattleStateMock
 	{
+		std::shared_ptr<PoolMock> pool;
 	public:
-		BattleFake();
+		BattleFake(std::shared_ptr<PoolMock> pool_);
 
 		void setUp();
+
+		scripting::Pool * getContextPool() const override;
 	};
 
-	std::shared_ptr<::spells::effects::Effect> subject;
-	::spells::ProblemMock problemMock;
-	::spells::MechanicsMock mechanicsMock;
+	std::shared_ptr<Effect> subject;
+	ProblemMock problemMock;
+	StrictMock<MechanicsMock> mechanicsMock;
+	StrictMock<CreatureServiceMock> creatureServiceMock;
+	StrictMock<CreatureMock> creatureStub;
+	StrictMock<SpellServiceMock> spellServiceMock;
+	StrictMock<SpellMock> spellStub;
+	StrictMock<IGameInfoCallbackMock> gameMock;
 	vstd::RNGMock rngMock;
 
 	UnitsFake unitsFake;
+
+	std::shared_ptr<PoolMock> pool;
 	std::shared_ptr<BattleFake> battleFake;
 
-	std::shared_ptr<::spells::BattleStateProxy> battleProxy;
+	std::shared_ptr<BattleStateProxy> battleProxy;
 
 	std::string effectName;
 
@@ -89,6 +113,7 @@ public:
 	virtual ~EffectFixture();
 
 	void setupEffect(const JsonNode & effectConfig);
+	void setupEffect(Registry * registry, const JsonNode & effectConfig);
 
 	void setupDefaultRNG();
 

@@ -11,6 +11,7 @@
 
 #include "mock/mock_MapService.h"
 #include "mock/mock_IGameCallback.h"
+#include "mock/mock_spells_Problem.h"
 
 #include "../../lib/VCMIDirs.h"
 #include "../../lib/CGameState.h"
@@ -223,6 +224,11 @@ TEST_F(CGameStateTest, issue2765)
 	ASSERT_EQ(def->getMyHero(), defender);
 
 	{
+		using namespace ::testing;
+
+		spells::ProblemMock problemMock;
+//		EXPECT_CALL(problemMock, add(_));
+
 		const CSpell * age = SpellID(SpellID::AGE).toSpell();
 		ASSERT_NE(age, nullptr);
 
@@ -230,11 +236,15 @@ TEST_F(CGameStateTest, issue2765)
 
 		//here tested ballista, but this applied to all war machines
 		spells::BattleCast cast(gameState->curB, &caster, spells::Mode::PASSIVE, age);
-		cast.aimToUnit(def);
 
-		EXPECT_FALSE(age->canBeCastAt(gameState->curB, spells::Mode::PASSIVE, &caster, def->getPosition()));
+		spells::Target target;
+		target.emplace_back(def);
 
-		EXPECT_TRUE(cast.castIfPossible(this));//should be possible, but with no effect (change to aimed cast check?)
+		auto m = age->battleMechanics(&cast);
+
+		EXPECT_FALSE(m->canBeCastAt(problemMock, target));
+
+		EXPECT_TRUE(cast.castIfPossible(this, target));//should be possible, but with no effect (change to aimed cast check?)
 
 		EXPECT_TRUE(def->activeSpells().empty());
 	}
@@ -315,17 +325,30 @@ TEST_F(CGameStateTest, battleResurrection)
 	EXPECT_EQ(unit->getCount(), 9);
 
 	{
+		using namespace ::testing;
+
+		spells::ProblemMock problemMock;
+		EXPECT_CALL(problemMock, add(_)).Times(AnyNumber()); //todo: do smth with problems of optional effects
+
 		const CSpell * spell = SpellID(SpellID::RESURRECTION).toSpell();
 		ASSERT_NE(spell, nullptr);
 
 		spells::BattleCast cast(gameState->curB, attacker, spells::Mode::HERO, spell);
-		cast.aimToUnit(unit);
 
-		EXPECT_TRUE(spell->canBeCast(gameState->curB, spells::Mode::HERO, attacker));
+		spells::Target target;
+		target.emplace_back(unit);
 
-		EXPECT_TRUE(spell->canBeCastAt(gameState->curB, spells::Mode::HERO, attacker, unit->getPosition()));
+		auto m = spell->battleMechanics(&cast);
 
-		cast.cast(this);
+		EXPECT_TRUE(m->canBeCast(problemMock));
+
+		EXPECT_TRUE(m->canBeCastAt(problemMock, target));
+
+		cast.cast(this, target);
+//
+//		std::vector<std::string> expLog;
+//
+//		EXPECT_THAT(problemMock.log, ContainerEq(expLog));
 	}
 
 	EXPECT_EQ(unit->health.getCount(), 10);

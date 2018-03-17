@@ -29,6 +29,7 @@
 #include "mapping/CMap.h"
 #include "CPlayerState.h"
 #include "CSkillHandler.h"
+#include "ScriptHandler.h"
 
 #include "serializer/Connection.h"
 
@@ -240,6 +241,19 @@ CArmedInstance * CNonConstInfoCallback::getArmyInstance(ObjectInstanceID oid)
 	return dynamic_cast<CArmedInstance *>(getObjInstance(oid));
 }
 
+void IGameCallback::showInfoDialog(InfoWindow * iw)
+{
+	commitPackage(iw);
+}
+
+void IGameCallback::showInfoDialog(const std::string &msg, PlayerColor player)
+{
+	InfoWindow iw;
+	iw.player = player;
+	iw.text << msg;
+	showInfoDialog(&iw);
+}
+
 const CGObjectInstance * IGameCallback::putNewObject(Obj ID, int subID, int3 pos)
 {
 	NewObject no;
@@ -257,6 +271,16 @@ const CGCreature * IGameCallback::putNewMonster(CreatureID creID, int count, int
 	setObjProperty(m->id, ObjProperty::MONSTER_POWER, (si64)1000*count);
 	return dynamic_cast<const CGCreature*>(m);
 }
+
+void IGameCallback::setObjProperty(ObjectInstanceID objid, int prop, si64 val)
+{
+	SetObjectProperty sob;
+	sob.id = objid;
+	sob.what = prop;
+	sob.val = static_cast<ui32>(val);
+	commitPackage(&sob);
+}
+
 
 bool IGameCallback::isVisitCoveredByAnotherQuery(const CGObjectInstance *obj, const CGHeroInstance *hero)
 {

@@ -41,7 +41,6 @@ private:
 
 	std::shared_ptr<BonusList> getBonuses(const Mechanics * m, const battle::Unit * unit) const;
 
-	static bool mainSelector(const Bonus * bonus);
 	void prepareEffects(SetStackEffect & pack, RNG & rng, const Mechanics * m, const EffectTarget & target, bool describe) const;
 };
 

@@ -38,6 +38,8 @@
 #include "../../lib/CondSh.h"
 #include "../../lib/CRandomGenerator.h"
 #include "../../lib/spells/CSpellHandler.h"
+#include "../../lib/spells/ISpellMechanics.h"
+#include "../../lib/spells/Problem.h"
 #include "../../lib/CTownHandler.h"
 #include "../../lib/CGameState.h"
 #include "../../lib/mapping/CMap.h"
@@ -1727,11 +1729,21 @@ void CBattleInterface::enterCreatureCastingMode()
 	if (creatureSpellToCast == -1)
 		return;
 
-	if (vstd::contains(possibleActions, NO_LOCATION))
+	if(vstd::contains(possibleActions, NO_LOCATION))
 	{
-		const spells::Caster *caster = activeStack;
-		const CSpell *spell = SpellID(creatureSpellToCast).toSpell();
-		const bool isCastingPossible = spell->canBeCastAt(curInt->cb.get(), spells::Mode::CREATURE_ACTIVE, caster, BattleHex::INVALID);
+		const spells::Caster * caster = activeStack;
+		const CSpell * spell = SpellID(creatureSpellToCast).toSpell();
+
+		spells::Target target;
+		target.emplace_back();
+
+
+		spells::BattleCast cast(curInt->cb.get(), caster, spells::Mode::CREATURE_ACTIVE, spell);
+
+		auto m = spell->battleMechanics(&cast);
+		spells::detail::ProblemImpl ignored;
+
+		const bool isCastingPossible = m->canBeCastAt(ignored, target);
 
 		if (isCastingPossible)
 		{
@@ -2574,7 +2586,16 @@ bool CBattleInterface::isCastingPossibleHere(const CStack *sactive, const CStack
 		else
 		{
 			const spells::Mode mode = creatureCasting ? spells::Mode::CREATURE_ACTIVE : spells::Mode::HERO;
-			isCastingPossible = sp->canBeCastAt(curInt->cb.get(), mode, caster, myNumber);
+
+			spells::Target target;
+			target.emplace_back(myNumber);
+
+			spells::BattleCast cast(curInt->cb.get(), caster, mode, sp);
+
+			auto m = sp->battleMechanics(&cast);
+			spells::detail::ProblemImpl problem; //todo: display problem in status bar
+
+			isCastingPossible = m->canBeCastAt(problem, target);
 		}
 	}
 	else
@@ -3174,7 +3195,9 @@ void CBattleInterface::showHighlightedHexes(SDL_Surface *to)
 				if(caster && spell) //when casting spell
 				{
 					// printing shaded hex(es)
-					auto shaded = spell->rangeInHexes(curInt->cb.get(), mode, caster, currentlyHoveredHex);
+					spells::BattleCast event(curInt->cb.get(), caster, mode, spell);
+					auto shaded = spell->battleMechanics(&event)->rangeInHexes(currentlyHoveredHex);
+
 					for(BattleHex shadedHex : shaded)
 					{
 						if((shadedHex.getX() != 0) && (shadedHex.getX() != GameConstants::BFIELD_WIDTH - 1))

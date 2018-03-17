@@ -63,6 +63,7 @@ TEST_F(CloneTest, ApplicableToValidTarget)
 
 TEST_F(CloneTest, CloneIsNotClonable)
 {
+	setupEffect(JsonNode());
 	auto & unit = unitsFake.add(BattleSide::ATTACKER);
 
 	EXPECT_CALL(unit, hasClone()).WillRepeatedly(Return(false));
@@ -77,6 +78,7 @@ TEST_F(CloneTest, CloneIsNotClonable)
 
 TEST_F(CloneTest, SecondCloneRejected)
 {
+	setupEffect(JsonNode());
 	auto & unit = unitsFake.add(BattleSide::ATTACKER);
 
 	EXPECT_CALL(unit, hasClone()).Times(AtLeast(1)).WillRepeatedly(Return(true));
@@ -173,6 +175,7 @@ protected:
 	void SetUp() override
 	{
 		EffectFixture::setUp();
+		setupEffect(JsonNode());
 
 		cloneAddInfo = std::make_shared<::battle::UnitInfo>();
 	}

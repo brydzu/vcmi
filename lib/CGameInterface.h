@@ -53,7 +53,10 @@ class CSaveFile;
 class BinaryDeserializer;
 class BinarySerializer;
 struct ArtifactLocation;
-class CScriptingModule;
+namespace scripting
+{
+	class Module;
+}
 
 class DLL_LINKAGE CBattleGameInterface : public IBattleEventsReceiver
 {
@@ -105,7 +108,7 @@ class DLL_LINKAGE CDynLibHandler
 public:
 	static std::shared_ptr<CGlobalAI> getNewAI(std::string dllname);
 	static std::shared_ptr<CBattleGameInterface> getNewBattleAI(std::string dllname);
-	static std::shared_ptr<CScriptingModule> getNewScriptingModule(std::string dllname);
+	static std::shared_ptr<scripting::Module> getNewScriptingModule(const boost::filesystem::path & dllname);
 };
 
 class DLL_LINKAGE CGlobalAI : public CGameInterface // AI class (to derivate)

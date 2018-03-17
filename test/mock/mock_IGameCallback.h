@@ -1,5 +1,5 @@
 /*
- * {file}.h, part of VCMI engine
+ * mock_IGameCallback.h, part of VCMI engine
  *
  * Authors: listed in file AUTHORS in main folder
  *
@@ -87,6 +87,8 @@ public:
 	///useful callback methods
 	void commitPackage(CPackForClient * pack) override;
 	void sendAndApply(CPackForClient * pack) override;
+
+	MOCK_CONST_METHOD0(getGlobalContextPool, scripting::Pool *());
 private:
 	const UpperCallback * upperCallback;
 };

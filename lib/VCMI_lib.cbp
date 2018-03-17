@@ -20,7 +20,6 @@
 					<Add option="-Og" />
 					<Add option="-g" />
 					<Add directory="$(#zlib.include)" />
-					<Add directory="lib/" />
 				</Compiler>
 				<Linker>
 					<Add option="-lws2_32" />
@@ -50,7 +49,6 @@
 					<Add option="-fomit-frame-pointer" />
 					<Add option="-O2" />
 					<Add directory="$(#zlib.include)" />
-					<Add directory="lib/" />
 				</Compiler>
 				<Linker>
 					<Add option="-s" />
@@ -82,7 +80,6 @@
 					<Add option="-Og" />
 					<Add option="-g" />
 					<Add directory="$(#zlib64.include)" />
-					<Add directory="lib/" />
 				</Compiler>
 				<Linker>
 					<Add option="-lws2_32" />
@@ -134,6 +131,7 @@
 		<Unit filename="../include/vstd/RNG.h" />
 		<Unit filename="../include/vstd/StringUtils.h" />
 		<Unit filename="AI_Base.h" />
+		<Unit filename="Artifact.h" />
 		<Unit filename="CArtHandler.cpp" />
 		<Unit filename="CArtHandler.h" />
 		<Unit filename="CBonusTypeHandler.cpp" />
@@ -167,6 +165,7 @@
 		<Unit filename="CPlayerState.h" />
 		<Unit filename="CRandomGenerator.cpp" />
 		<Unit filename="CRandomGenerator.h" />
+		<Unit filename="CScriptingModule.cpp" />
 		<Unit filename="CScriptingModule.h" />
 		<Unit filename="CSkillHandler.cpp" />
 		<Unit filename="CSkillHandler.h" />
@@ -180,6 +179,8 @@
 		<Unit filename="CTownHandler.h" />
 		<Unit filename="CondSh.h" />
 		<Unit filename="ConstTransitivePtr.h" />
+		<Unit filename="Creature.h" />
+		<Unit filename="CreatureService.h" />
 		<Unit filename="FunctionList.h" />
 		<Unit filename="GameConstants.cpp" />
 		<Unit filename="GameConstants.h" />
@@ -205,6 +206,10 @@
 		<Unit filename="ResourceSet.cpp" />
 		<Unit filename="ResourceSet.h" />
 		<Unit filename="ScopeGuard.h" />
+		<Unit filename="ScriptHandler.cpp" />
+		<Unit filename="ScriptHandler.h" />
+		<Unit filename="ScriptingService.h" />
+		<Unit filename="Services.h" />
 		<Unit filename="StartInfo.cpp" />
 		<Unit filename="StartInfo.h" />
 		<Unit filename="StdInc.h">
@@ -243,6 +248,7 @@
 		<Unit filename="battle/CUnitState.h" />
 		<Unit filename="battle/Destination.cpp" />
 		<Unit filename="battle/Destination.h" />
+		<Unit filename="battle/IBattleEventRealizer.h" />
 		<Unit filename="battle/IBattleState.cpp" />
 		<Unit filename="battle/IBattleState.h" />
 		<Unit filename="battle/IUnitInfo.h" />
@@ -402,6 +408,8 @@
 		<Unit filename="spells/Problem.h" />
 		<Unit filename="spells/ProxyCaster.cpp" />
 		<Unit filename="spells/ProxyCaster.h" />
+		<Unit filename="spells/Spell.h" />
+		<Unit filename="spells/SpellService.h" />
 		<Unit filename="spells/TargetCondition.cpp" />
 		<Unit filename="spells/TargetCondition.h" />
 		<Unit filename="spells/ViewSpellInt.cpp" />

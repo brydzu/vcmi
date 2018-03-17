@@ -40,7 +40,7 @@ Catapult::~Catapult() = default;
 
 bool Catapult::applicable(Problem & problem, const Mechanics * m) const
 {
-	auto town = m->cb->battleGetDefendedTown();
+	auto town = m->battle()->battleGetDefendedTown();
 
 	if(nullptr == town)
 	{
@@ -58,7 +58,7 @@ bool Catapult::applicable(Problem & problem, const Mechanics * m) const
 		return m->adaptProblem(ESpellCastProblem::NO_APPROPRIATE_TARGET, problem);
 	}
 
-	const auto attackableBattleHexes = m->cb->getAttackableBattleHexes();
+	const auto attackableBattleHexes = m->battle()->getAttackableBattleHexes();
 
 	if(attackableBattleHexes.empty())
 		return m->adaptProblem(ESpellCastProblem::NO_APPROPRIATE_TARGET, problem);
@@ -93,7 +93,7 @@ void Catapult::apply(BattleStateProxy * battleState, RNG & rng, const Mechanics 
 		//Any destructible part can be hit regardless of its HP. Multiple hit on same target is allowed.
 		EWallPart::EWallPart target = *RandomGeneratorUtil::nextItem(possibleTargets, rng);
 
-		auto state = m->cb->battleGetWallState(target);
+		auto state = m->battle()->battleGetWallState(target);
 
 		if(state == EWallState::DESTROYED || state == EWallState::NONE)
 			continue;
@@ -102,7 +102,7 @@ void Catapult::apply(BattleStateProxy * battleState, RNG & rng, const Mechanics 
 
 		attackInfo.damageDealt = 1;
 		attackInfo.attackedPart = target;
-		attackInfo.destinationTile = m->cb->wallPartToBattleHex(target);
+		attackInfo.destinationTile = m->battle()->wallPartToBattleHex(target);
 
 		ca.attackedParts.push_back(attackInfo);
 
@@ -124,7 +124,7 @@ void Catapult::apply(BattleStateProxy * battleState, RNG & rng, const Mechanics 
 
 		if(posRemove != BattleHex::INVALID && state - attackInfo.damageDealt <= 0) //HP enum subtraction not intuitive, consider using SiegeInfo::applyDamage
 		{
-			auto all = m->cb->battleGetUnitsIf([=](const battle::Unit * unit)
+			auto all = m->battle()->battleGetUnitsIf([=](const battle::Unit * unit)
 			{
 				return !unit->isGhost();
 			});

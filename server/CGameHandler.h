@@ -30,6 +30,12 @@ class IMarket;
 
 class SpellCastEnvironment;
 
+namespace scripting
+{
+	class PoolImpl;
+}
+
+
 template<typename T> class CApplier;
 class CBaseForGHApply;
 
@@ -283,6 +289,13 @@ public:
 				h & duel;
 			}
 			h & remainingBattleQueriesCount;
+
+			if(version >= 790)
+			{
+				//TODO: serialize scripts state
+				JsonNode scriptsState;
+				h & scriptsState;
+			}
 		}
 	};
 
@@ -302,7 +315,10 @@ public:
 
 	CRandomGenerator & getRandomGenerator();
 
+	scripting::Pool * getGlobalContextPool() const override;
+	scripting::Pool * getContextPool() const override;
 private:
+	std::shared_ptr<scripting::PoolImpl> serverScripts;
 	std::list<PlayerColor> generatePlayerTurnOrder() const;
 	void makeStackDoNothing(const CStack * next);
 	void getVictoryLossMessage(PlayerColor player, const EVictoryLossCheckResult & victoryLossCheckResult, InfoWindow & out) const;
@@ -311,6 +327,8 @@ private:
 	void checkVictoryLossConditionsForPlayer(PlayerColor player);
 	void checkVictoryLossConditions(const std::set<PlayerColor> & playerColors);
 	void checkVictoryLossConditionsForAll();
+
+
 };
 
 class ExceptionNotAllowedAction : public std::exception

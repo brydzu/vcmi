@@ -95,7 +95,7 @@ bool Teleport::prepareEffects(std::string & errorMessage, BattleStackMoved & pac
 	}
 
 	//TODO: move here all teleport checks
-	if(!m->cb->battleCanTeleportTo(targetUnit, destination, m->getEffectLevel()))
+	if(!m->battle()->battleCanTeleportTo(targetUnit, destination, m->getEffectLevel()))
 	{
 		errorMessage = "Forbidden teleport.";
 		return false;

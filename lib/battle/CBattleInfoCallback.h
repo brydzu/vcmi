@@ -21,6 +21,13 @@ struct CObstacleInstance;
 class IBonusBearer;
 class CRandomGenerator;
 
+namespace scripting
+{
+	class Context;
+	class Pool;
+	class Script;
+}
+
 struct DLL_LINKAGE AttackableTiles
 {
 	std::set<BattleHex> hostileCreaturePositions;
@@ -39,6 +46,8 @@ public:
 	{
 		RANDOM_GENIE, RANDOM_AIMED
 	};
+
+	std::shared_ptr<scripting::Context> getScriptingContext(const scripting::Script * script) const;
 
 	boost::optional<int> battleIsFinished() const; //return none if battle is ongoing; otherwise the victorious side (0/1) or 2 if it is a draw
 
@@ -122,4 +131,6 @@ protected:
 	ReachabilityInfo getFlyingReachability(const ReachabilityInfo::Parameters & params) const;
 	ReachabilityInfo makeBFS(const AccessibilityInfo & accessibility, const ReachabilityInfo::Parameters & params) const;
 	std::set<BattleHex> getStoppers(BattlePerspective::BattlePerspective whichSidePerspective) const; //get hexes with stopping obstacles (quicksands)
+
+	virtual scripting::Pool * getContextPool() const = 0;
 };
