@@ -27,338 +27,726 @@ using namespace ::VERMInterpreter;
 
 typedef int TUnusedType;
 
-
-namespace ERMPrinter
+namespace ERMConverter
 {
 	//console printer
 	using namespace ERM;
 
-	struct VarPrinterVisitor : boost::static_visitor<>
+	enum class EDir{GET, SET};
+
+	struct LVL2Iexp : boost::static_visitor<std::string>
 	{
-		void operator()(TVarExpNotMacro const& val) const
+		EDir dir;
+
+		LVL2Iexp(EDir dir_)
+			: dir(dir_)
+		{}
+
+		std::string processNotMacro(TVarExpNotMacro const & val) const
 		{
-			logGlobal->debug(val.varsym);
+			if(val.questionMark.is_initialized())
+				throw EIexpProblem("Question marks ('?') are not allowed in getter i-expressions");
+
+			//TODO:
+
 			if(val.val.is_initialized())
 			{
-				logGlobal->debug("%d", val.val.get());
-			}
-		}
-		void operator()(TMacroUsage const& val) const
-		{
-			logGlobal->debug("$%s$", val.macro);
-		}
-	};
-
-	void varPrinter(const TVarExp & var)
-	{
-		boost::apply_visitor(VarPrinterVisitor(), var);
-	}
-
-	struct IExpPrinterVisitor : boost::static_visitor<>
-	{
-		void operator()(int const & constant) const
-		{
-			logGlobal->debug("%d", constant);
-		}
-		void operator()(TVarExp const & var) const
-		{
-			varPrinter(var);
-		}
-	};
-
-
-	void iexpPrinter(const TIexp & exp)
-	{
-		boost::apply_visitor(IExpPrinterVisitor(), exp);
-	}
-
-	struct IdentifierPrinterVisitor : boost::static_visitor<>
-	{
-		void operator()(TIexp const& iexp) const
-		{
-			iexpPrinter(iexp);
-		}
-		void operator()(TArithmeticOp const& arop) const
-		{
-			iexpPrinter(arop.lhs);
-			logGlobal->debug(" %s ", arop.opcode);
-			iexpPrinter(arop.rhs);
-		}
-	};
-
-	void identifierPrinter(const boost::optional<Tidentifier> & id)
-	{
-		if(id.is_initialized())
-		{
-			logGlobal->debug("identifier: ");
-			for (auto x : id.get())
-			{
-				logGlobal->debug("#");
-				boost::apply_visitor(IdentifierPrinterVisitor(), x);
-			}
-		}
-	}
-
-	struct ConditionCondPrinterVisitor : boost::static_visitor<>
-	{
-		void operator()(TComparison const& cmp) const
-		{
-			iexpPrinter(cmp.lhs);
-			logGlobal->debug(" %s ", cmp.compSign);
-			iexpPrinter(cmp.rhs);
-		}
-		void operator()(int const& flag) const
-		{
-			logGlobal->debug("condflag %d", flag);
-		}
-	};
-
-	void conditionPrinter(const boost::optional<Tcondition> & cond)
-	{
-		if(cond.is_initialized())
-		{
-			Tcondition condp = cond.get();
-			logGlobal->debug(" condition: ");
-			boost::apply_visitor(ConditionCondPrinterVisitor(), condp.cond);
-			logGlobal->debug(" cond type: %s", condp.ctype);
-
-			//recursive call
-			if(condp.rhs.is_initialized())
-			{
-				logGlobal->debug("rhs: ");
-				boost::optional<Tcondition> rhsc = condp.rhs.get().get();
-				conditionPrinter(rhsc);
+				return boost::to_string(boost::format("%s[%d]") % val.varsym % val.val.get());
 			}
 			else
 			{
-				logGlobal->debug("no rhs; ");
+				return val.varsym;
 			}
 		}
-	}
 
-	struct BodyVarpPrinterVisitor : boost::static_visitor<>
-	{
-		void operator()(TVarExpNotMacro const& cmp) const
+		std::string operator()(TVarExpNotMacro const & val) const
 		{
-			if(cmp.questionMark.is_initialized())
+			return processNotMacro(val);
+		}
+
+		std::string operator()(TMacroUsage const & val) const
+		{
+			return val.macro;
+		}
+	};
+
+	struct LVL1Iexp : boost::static_visitor<std::string>
+	{
+		EDir dir;
+
+		LVL1Iexp(EDir dir_)
+			: dir(dir_)
+		{}
+
+		LVL1Iexp()
+			: dir(EDir::GET)
+		{}
+
+		std::string operator()(int const & constant) const
+		{
+			if(dir == EDir::GET)
 			{
-				logGlobal->debug("%s", cmp.questionMark.get());
+				return boost::lexical_cast<std::string>(constant);
 			}
-			if(cmp.val.is_initialized())
+			else
 			{
-				logGlobal->debug("val:%d",cmp.val.get());
+				throw EIexpProblem("Cannot set a constant!");
 			}
-			logGlobal->debug("varsym: |%s|",cmp.varsym);
 		}
-		void operator()(TMacroUsage const& cmp) const
+
+		std::string operator()(TVarExp const & var) const
 		{
-			logGlobal->debug("???$$%s$$", cmp.macro);
+			return boost::apply_visitor(LVL2Iexp(dir), var);
 		}
 	};
 
-	struct BodyOptionItemPrinterVisitor : boost::static_visitor<>
+	struct Condition : public boost::static_visitor<std::string>
 	{
-		void operator()(TVarConcatString const& cmp) const
-		{
-			logGlobal->debug("+concat\"");
-			varPrinter(cmp.var);
-			logGlobal->debug(" with %s", cmp.string.str);
-		}
-		void operator()(TStringConstant const& cmp) const
-		{
-			logGlobal->debug(" \"%s\" ", cmp.str);
-		}
-		void operator()(TCurriedString const& cmp) const
-		{
-			logGlobal->debug("cs: ");
-			iexpPrinter(cmp.iexp);
-			logGlobal->debug(" '%s' ", cmp.string.str);
-		}
-		void operator()(TSemiCompare const& cmp) const
-		{
-			logGlobal->debug("%s; rhs: ", cmp.compSign);
-			iexpPrinter(cmp.rhs);
-		}
-		void operator()(TMacroUsage const& cmp) const
-		{
-			logGlobal->debug("$$%s$$", cmp.macro);
-		}
-		void operator()(TMacroDef const& cmp) const
-		{
-			logGlobal->debug("@@%s@@", cmp.macro);
-		}
-		void operator()(TIexp const& cmp) const
-		{
-			iexpPrinter(cmp);
-		}
-		void operator()(TVarpExp const& cmp) const
-		{
-			logGlobal->debug("varp");
-			boost::apply_visitor(BodyVarpPrinterVisitor(), cmp.var);
-		}
-		void operator()(spirit::unused_type const& cmp) const
-		{
-			logGlobal->debug("nothing");
-		}
-	};
+		Condition()
+		{}
 
-	struct BodyOptionVisitor : boost::static_visitor<>
-	{
-		void operator()(TVRLogic const& cmp) const
+		std::string operator()(TComparison const & cmp) const
 		{
-			logGlobal->debug("%s ", cmp.opcode);
-			iexpPrinter(cmp.var);
-		}
-		void operator()(TVRArithmetic const& cmp) const
-		{
-			logGlobal->debug("%s ", cmp.opcode);
-			iexpPrinter(cmp.rhs);
-		}
-		void operator()(TNormalBodyOption const& cmp) const
-		{
-			logGlobal->debug("%s~",cmp.optionCode);
-			for (auto optList : cmp.params)
+			std::string lhs = boost::apply_visitor(LVL1Iexp(), cmp.lhs);
+			std::string rhs = boost::apply_visitor(LVL1Iexp(), cmp.rhs);
+
+			static const std::map<std::string, std::string> OPERATION =
 			{
-				boost::apply_visitor(BodyOptionItemPrinterVisitor(), optList);
-			}
+				{"<", "<"},
+				{">", ">"},
+				{">=", ">="},
+				{"=>", ">="},
+				{"<=", "<="},
+				{"=<", "<="},
+				{"==", "=="},
+				{"<>", "~="},
+				{"><", "~="},
+			};
+
+			auto sign = OPERATION.find(cmp.compSign);
+			if(sign == std::end(OPERATION))
+				throw EScriptExecError(std::string("Wrong comparison sign: ") + cmp.compSign);
+
+			boost::format fmt("(%s %s %s)");
+			fmt % lhs % sign->second % rhs;
+			return fmt.str();
+		}
+		std::string operator()(int const & flag) const
+		{
+			return boost::to_string(boost::format("ERM.flag[%d]") % flag);
 		}
 	};
 
-	void bodyPrinter(const Tbody & body)
+	struct ParamIO
 	{
-		logGlobal->debug(" body items: ");
-		for (auto bi: body)
-		{
-			logGlobal->debug(" (");
-			apply_visitor(BodyOptionVisitor(), bi);
-			logGlobal->debug(") ");
-		}
-	}
+		std::string name;
+		bool isInput;
+	};
 
-	struct CommandPrinterVisitor : boost::static_visitor<>
+	struct Converter : public boost::static_visitor<>
 	{
-		void operator()(Ttrigger const& trig) const
-		{
-			logGlobal->debug("trigger: %s ", trig.name);
-			identifierPrinter(trig.identifier);
-			conditionPrinter(trig.condition);
-		}
-		void operator()(Tinstruction const& trig) const
-		{
-			logGlobal->debug("instruction: %s", trig.name);
-			identifierPrinter(trig.identifier);
-			conditionPrinter(trig.condition);
-			bodyPrinter(trig.body);
+		mutable std::ostream * out;
+		Converter(std::ostream * out_)
+			: out(out_)
+		{}
+	};
 
-		}
-		void operator()(Treceiver const& trig) const
-		{
-			logGlobal->debug("receiver: %s ", trig.name);
+	struct GetBodyOption : public boost::static_visitor<std::string>
+	{
+		GetBodyOption()
+		{}
 
-			identifierPrinter(trig.identifier);
-			conditionPrinter(trig.condition);
-			if(trig.body.is_initialized())
-				bodyPrinter(trig.body.get());
-		}
-		void operator()(TPostTrigger const& trig) const
+		virtual std::string operator()(TVarConcatString const & cmp) const
 		{
-			logGlobal->debug("post trigger: %s ", trig.name);
-			identifierPrinter(trig.identifier);
-			conditionPrinter(trig.condition);
+			throw EScriptExecError("String concatenation not allowed in this receiver");
+		}
+		virtual std::string operator()(TStringConstant const & cmp) const
+		{
+			throw EScriptExecError("String constant not allowed in this receiver");
+		}
+		virtual std::string operator()(TCurriedString const & cmp) const
+		{
+			throw EScriptExecError("Curried string not allowed in this receiver");
+		}
+		virtual std::string operator()(TSemiCompare const & cmp) const
+		{
+			throw EScriptExecError("Semi comparison not allowed in this receiver");
+		}
+	// 	virtual void operator()(TMacroUsage const& cmp) const
+	// 	{
+	// 		throw EScriptExecError("Macro usage not allowed in this receiver");
+	// 	}
+		virtual std::string operator()(TMacroDef const & cmp) const
+		{
+			throw EScriptExecError("Macro definition not allowed in this receiver");
+		}
+		virtual std::string operator()(TIexp const & cmp) const
+		{
+			throw EScriptExecError("i-expression not allowed in this receiver");
+		}
+		virtual std::string operator()(TVarpExp const & cmp) const
+		{
+			throw EScriptExecError("Varp expression not allowed in this receiver");
+		}
+		virtual std::string operator()(spirit::unused_type const & cmp) const
+		{
+			throw EScriptExecError("\'Nothing\' not allowed in this receiver");
 		}
 	};
 
-	struct LinePrinterVisitor : boost::static_visitor<>
+	struct BodyOption : public boost::static_visitor<ParamIO>
 	{
-		void operator()(Tcommand const& cmd) const
+		ParamIO operator()(TVarConcatString const & cmp) const
 		{
-			CommandPrinterVisitor un;
-			boost::apply_visitor(un, cmd.cmd);
-//			logGlobal->debug("Line comment: %s", cmd.comment);
+			throw EScriptExecError("String concatenation not allowed in this receiver");
 		}
-		void operator()(std::string const& comment) const
+
+		ParamIO operator()(TStringConstant const & cmp) const
 		{
+			boost::format fmt("[===[%s]===]");
+			fmt % cmp.str;
+
+			ParamIO ret;
+			ret.isInput = true;
+			ret.name = fmt.str();
+			return ret;
 		}
-		void operator()(spirit::unused_type const& nothing) const
+
+		ParamIO operator()(TCurriedString const & cmp) const
 		{
+			throw EScriptExecError("Curried string not allowed in this receiver");
+		}
+
+		ParamIO operator()(TSemiCompare const & cmp) const
+		{
+			throw EScriptExecError("Semi comparison not allowed in this receiver");
+		}
+
+		ParamIO operator()(TMacroDef const & cmp) const
+		{
+			throw EScriptExecError("Macro definition not allowed in this receiver");
+		}
+
+		ParamIO operator()(TIexp const & cmp) const
+		{
+			ParamIO ret;
+			ret.isInput = true;
+			ret.name = boost::apply_visitor(LVL1Iexp(), cmp);
+			return ret;
+		}
+
+		ParamIO operator()(TVarpExp const & cmp) const
+		{
+//			ParamIO ret;
+//			ret.isInput = false;
+//
+//			ret.name = "";
+//			return ret;
+			throw EScriptExecError("Not implemented");
+		}
+
+		ParamIO operator()(spirit::unused_type const & cmp) const
+		{
+			throw EScriptExecError("\'Nothing\' not allowed in this receiver");
 		}
 	};
 
-	void printERM(const TERMline & ast)
+	struct VR_S : public GetBodyOption
 	{
-		logGlobal->debug("");
+		VR_S()
+		{}
 
-		boost::apply_visitor(LinePrinterVisitor(), ast);
-	}
+		using GetBodyOption::operator();
 
-	void printTVExp(const TVExp & exp);
-
-	struct VOptionPrinterVisitor : boost::static_visitor<>
-	{
-		void operator()(TVExp const& cmd) const
+		std::string operator()(TIexp const & cmp) const override
 		{
-			printTVExp(cmd);
+			return boost::apply_visitor(LVL1Iexp(), cmp);
 		}
-		void operator()(TSymbol const& cmd) const
+		std::string operator()(TStringConstant const & cmp) const override
 		{
-			for(auto mod : cmd.symModifier)
+			boost::format fmt("[===[%s]===]");
+			fmt % cmp.str;
+			return fmt.str();
+		}
+	};
+
+	struct Receiver : public Converter
+	{
+		std::string name;
+		std::vector<std::string> identifiers;
+
+		Receiver(std::ostream * out_, std::string name_, std::vector<std::string> identifiers_)
+			: Converter(out_),
+			name(name_),
+			identifiers(identifiers_)
+		{}
+
+		void operator()(TVRLogic const & trig) const
+		{
+			throw EInterpreterError("VR logic is not allowed in this receiver!");
+		}
+
+		void operator()(TVRArithmetic const & trig) const
+		{
+			throw EInterpreterError("VR arithmetic is not allowed in this receiver!");
+		}
+
+		void operator()(TNormalBodyOption const & trig) const
+		{
+			std::string params;
+			std::string outParams;
+			std::string inParams;
+
+			for(auto iter = std::begin(identifiers); iter != std::end(identifiers); ++iter)
 			{
-				logGlobal->debug(mod);
+				params += ", ";
+				params += *iter;
 			}
-			logGlobal->debug(cmd.sym);
-		}
-		void operator()(char const& cmd) const
-		{
-			logGlobal->debug("'%s'", cmd);
-		}
-		void operator()(int const& cmd) const
-		{
-			logGlobal->debug("%d", cmd);
-		}
-		void operator()(double const& cmd) const
-		{
-			logGlobal->debug("%f", cmd);
-		}
-		void operator()(TERMline const& cmd) const
-		{
-			printERM(cmd);
-		}
-		void operator()(TStringConstant const& cmd) const
-		{
-			logGlobal->debug("^%s^", cmd.str);
+
+			{
+				std::vector<ParamIO> optionParams;
+
+				for(auto & p : trig.params)
+					optionParams.push_back(boost::apply_visitor(BodyOption(), p));
+
+				for(auto & p : optionParams)
+				{
+					if(p.isInput)
+					{
+						if(outParams.empty())
+							outParams = "_";
+						else
+							outParams += ", _";
+
+						inParams += ", ";
+						inParams += p.name;
+					}
+					else
+					{
+						if(outParams.empty())
+						{
+							outParams = p.name;
+						}
+						else
+						{
+							outParams += ", ";
+							outParams += p.name;
+						}
+
+						inParams += ", nil";
+					}
+				}
+			}
+
+			boost::format callFormat("%s = ERM.%s(x%s):%s(x%s)");
+
+			callFormat % outParams;
+			callFormat % name;
+			callFormat % params;
+			callFormat % trig.optionCode;
+			callFormat % inParams;
+
+			(*out) << callFormat.str() << std::endl;
 		}
 	};
 
-	void printTVExp(const TVExp & exp)
+	struct VR : public Converter
 	{
-		for (auto mod: exp.modifier)
-		{
-			logGlobal->debug("%s ", mod);
-		}
-		logGlobal->debug("[ ");
-		for (auto opt: exp.children)
-		{
-			boost::apply_visitor(VOptionPrinterVisitor(), opt);
-			logGlobal->debug(" ");
-		}
-		logGlobal->debug("]");
-	}
+		std::string var;
 
-	struct TLPrinterVisitor : boost::static_visitor<>
-	{
-		void operator()(TVExp const& cmd) const
+		VR(std::ostream * out_, std::string var_)
+			: Converter(out_),
+			var(var_)
+		{}
+
+		void operator()(TVRLogic const & trig) const
 		{
-			printTVExp(cmd);
+			std::string rhs = boost::apply_visitor(LVL1Iexp(), trig.var);
+
+			std::string opcode;
+
+			switch (trig.opcode)
+			{
+			case '&':
+				opcode = "bit.band";
+				break;
+			case '|':
+				opcode = "bit.bor";
+				break;
+			case 'X':
+				opcode = "bit.bxor";
+				break;
+			default:
+				throw EInterpreterError("Wrong opcode in VR logic expression!");
+				break;
+			}
+
+			boost::format fmt("%s = %s %s(%s, %s)");
+			fmt % var % opcode % var % rhs;
+
+			(*out) << fmt.str() << std::endl;
 		}
-		void operator()(TERMline const& cmd) const
+
+		void operator()(TVRArithmetic const & trig) const
 		{
-			printERM(cmd);
+			std::string rhs = boost::apply_visitor(LVL1Iexp(), trig.rhs);
+
+			std::string opcode;
+
+			switch (trig.opcode)
+			{
+			case '+':
+			case '-':
+			case '*':
+			case '%':
+				opcode = trig.opcode;
+				break;
+			case ':':
+				opcode = "/";
+			default:
+				throw EInterpreterError("Wrong opcode in VR arithmetic!");
+				break;
+			}
+
+			boost::format fmt("%s = %s %s %s");
+			fmt % var %  var % opcode % rhs;
+			(*out) << fmt.str() << std::endl;
+		}
+
+		void operator()(TNormalBodyOption const & trig) const
+		{
+			switch(trig.optionCode)
+			{
+			case 'C': //setting/checking v vars
+				{
+					//TODO
+				}
+				break;
+			case 'H': //checking if string is empty
+				{
+					//TODO
+				}
+				break;
+			case 'M': //string operations
+				{
+					//TODO
+				}
+				break;
+			case 'R': //random variables
+				{
+					//TODO
+				}
+				break;
+			case 'S': //setting variable
+				{
+					if(trig.params.size() != 1)
+						throw EScriptExecError("VR:S option takes exactly 1 parameter!");
+
+					std::string opt = boost::apply_visitor(VR_S(), trig.params[0]);
+
+					(*out) << var  << " = " << opt << std::endl;
+				}
+				break;
+			case 'T': //random variables
+				{
+					//TODO
+				}
+				break;
+			case 'U': //search for a substring
+				{
+					//TODO
+				}
+				break;
+			case 'V': //convert string to value
+				{
+					//TODO
+				}
+				break;
+			default:
+				throw EScriptExecError("Wrong VR receiver option!");
+				break;
+			}
 		}
 	};
 
-	void printAST(const TLine & ast)
+
+	struct ERMExp : public Converter
 	{
-		boost::apply_visitor(TLPrinterVisitor(), ast);
+		ERMExp(std::ostream * out_)
+			: Converter(out_)
+		{}
+
+		template <typename Visitor>
+		void performBody(const boost::optional<ERM::Tbody> & body, const Visitor & visitor) const
+		{
+			if(body.is_initialized())
+			{
+				ERM::Tbody bo = body.get();
+				for(int g=0; g<bo.size(); ++g)
+				{
+					boost::apply_visitor(visitor, bo[g]);
+				}
+			}
+		}
+
+		void convert(const std::string & name, boost::optional<Tidentifier> identifier, boost::optional<Tbody> body) const
+		{
+			if(name == "VR")
+			{
+				if(!identifier.is_initialized())
+					throw EScriptExecError("VR receiver requires arguments");
+
+				ERM::Tidentifier tid = identifier.get();
+				if(tid.size() != 1)
+					throw EScriptExecError("VR receiver takes exactly 1 argument");
+
+				auto var = boost::apply_visitor(LVL1Iexp(), tid[0]);
+
+				performBody(body, VR(out, var));
+
+			}
+			else if(name == "FU")
+			{
+				//TODO:
+			}
+			else if(name == "DO")
+			{
+				//TODO: use P body option
+				//TODO: pass|return parameters
+				if(!identifier.is_initialized())
+					throw EScriptExecError("DO receiver requires arguments");
+
+				ERM::Tidentifier tid = identifier.get();
+				if(tid.size() != 4)
+					throw EScriptExecError("DO receiver takes exactly 4 arguments");
+
+				auto funNum = boost::apply_visitor(LVL1Iexp(), tid[0]);
+				auto startVal = boost::apply_visitor(LVL1Iexp(), tid[1]);
+				auto stopVal = boost::apply_visitor(LVL1Iexp(), tid[2]);
+				auto increment = boost::apply_visitor(LVL1Iexp(), tid[3]);
+
+				(*out) << "\t" << "for __iter = " << startVal <<", " << stopVal << "-1, " << increment << " do " << std::endl;
+				(*out) << "\t\t" << "local x = x or {}" << std::endl;
+				(*out) << "\t\t" << "x[16] = __iter" << std::endl;
+				(*out) << "\t\t" << "FU" << funNum << "(x)" << std::endl;
+				(*out) << "\t\t" << "__iter = x[16]" << std::endl;
+				(*out) << "\t" << "end" << std::endl;
+			}
+			else
+			{
+				std::vector<std::string> identifiers;
+
+				if(identifier.is_initialized())
+				{
+					for(const auto & id : identifier.get())
+						identifiers.push_back(boost::apply_visitor(LVL1Iexp(), id));
+				}
+
+				performBody(body, Receiver(out, name, identifiers));
+			}
+		}
+
+		void convertConditionInner(Tcondition const & cond, char op) const
+		{
+			std::string lhs = boost::apply_visitor(Condition(), cond.cond);
+
+			if(cond.ctype != '/')
+				op = cond.ctype;
+
+			switch (op)
+			{
+			case '&':
+				(*out) << " and ";
+				break;
+			case '|':
+				(*out) << " or ";
+				break;
+			default:
+				throw EInterpreterProblem(std::string("Wrong condition connection (") + cond.ctype + ") !");
+				break;
+			}
+
+			(*out) << lhs;
+
+			if(cond.rhs.is_initialized())
+			{
+				switch (op)
+				{
+				case '&':
+				case '|':
+					break;
+				default:
+					throw EInterpreterProblem(std::string("Wrong condition connection (") + cond.ctype + ") !");
+					break;
+				}
+
+				convertConditionInner(cond.rhs.get().get(), op);
+			}
+		}
+
+		void convertConditionOuter(Tcondition const & cond) const
+		{
+			//&c1/c2/c3|c4/c5/c6 -> (c1  & c2  & c3)  | c4  |  c5  | c6
+			std::string lhs = boost::apply_visitor(Condition(), cond.cond);
+
+			(*out) << lhs;
+
+			if(cond.rhs.is_initialized())
+			{
+				switch (cond.ctype)
+				{
+				case '&':
+				case '|':
+					break;
+				default:
+					throw EInterpreterProblem(std::string("Wrong condition connection (") + cond.ctype + ") !");
+					break;
+				}
+
+				convertConditionInner(cond.rhs.get().get(), cond.ctype);
+			}
+		}
+
+		void convertCondition(Tcondition const & cond) const
+		{
+			(*out) << " if ";
+			convertConditionOuter(cond);
+			(*out) << " then " << std::endl;
+		}
+
+		void operator()(Ttrigger const & trig) const
+		{
+			throw EInterpreterError("Triggers cannot be executed!");
+		}
+
+		void operator()(TPostTrigger const & trig) const
+		{
+			throw EInterpreterError("Post-triggers cannot be executed!");
+		}
+
+		void operator()(Tinstruction const & trig) const
+		{
+			if(trig.condition.is_initialized())
+			{
+				convertCondition(trig.condition.get());
+
+				convert(trig.name, trig.identifier, boost::make_optional(trig.body));
+
+				(*out) << "end" << std::endl;
+
+			}
+			else
+			{
+				convert(trig.name, trig.identifier, boost::make_optional(trig.body));
+			}
+		}
+
+		void operator()(Treceiver const & trig) const
+		{
+			if(trig.condition.is_initialized())
+			{
+				convertCondition(trig.condition.get());
+
+				convert(trig.name, trig.identifier, trig.body);
+
+				(*out) << "end" << std::endl;
+			}
+			else
+			{
+				convert(trig.name, trig.identifier, trig.body);
+			}
+		}
+	};
+
+	struct Command : public Converter
+	{
+		Command(std::ostream * out_)
+			: Converter(out_)
+		{}
+
+		void operator()(Tcommand const & cmd) const
+		{
+			boost::apply_visitor(ERMExp(out), cmd.cmd);
+		}
+		void operator()(std::string const & comment) const
+		{
+			(*out) << "-- " << comment << std::endl;
+		}
+
+		void operator()(spirit::unused_type const &) const
+		{
+		}
+	};
+
+	struct Line : public Converter
+	{
+		Line(std::ostream * out_)
+			: Converter(out_)
+		{}
+
+		void operator()(TVExp const & cmd) const
+		{
+			//TODO:
+//			VNode line(cmd);
+//			interp->eval(line);
+		}
+		void operator()(TERMline const & cmd) const
+		{
+			boost::apply_visitor(Command(out), cmd);
+		}
+	};
+
+	void convertFunctions(std::ostream & out, ERMInterpreter * owner, const std::vector<VERMInterpreter::Trigger> & triggers)
+	{
+		std::map<std::string, LinePointer> numToBody;
+
+		Line lineConverter(&out);
+
+		for(const VERMInterpreter::Trigger & trigger : triggers)
+		{
+			ERM::TLine firstLine = owner->retrieveLine(trigger.line);
+
+			const ERM::TTriggerBase & trig = ERMInterpreter::retrieveTrigger(firstLine);
+
+			if(!trig.identifier.is_initialized())
+				throw EInterpreterError("Function must have identifier");
+
+			ERM::Tidentifier tid = trig.identifier.get();
+
+			if(tid.size() == 0)
+				throw EInterpreterError("Function must have identifier");
+
+			std::string num = boost::apply_visitor(LVL1Iexp(), tid[0]);
+
+			if(vstd::contains(numToBody, num))
+				throw EInterpreterError("Function index duplicated: "+num);
+
+			numToBody[num] = trigger.line;
+		}
+
+		for(const auto & p : numToBody)
+		{
+			std::string name = "FU"+p.first;
+
+			out << name << " = function(x)" << std::endl;
+
+			LinePointer lp = p.second;
+
+			++lp;
+
+			out << "local y = ERM.getY('" << name << "')" << std::endl;
+
+			for(; lp.isValid(); ++lp)
+			{
+				ERM::TLine curLine = owner->retrieveLine(lp);
+				if(owner->isATrigger(curLine))
+					break;
+
+				boost::apply_visitor(lineConverter, curLine);
+			}
+
+			out << "end" << std::endl;
+		}
 	}
 }
 
@@ -403,22 +791,6 @@ struct ScriptScanner : boost::static_visitor<>
 
 	}
 };
-
-void ERMInterpreter::printScripts(EPrintMode mode)
-{
-	std::map< LinePointer, ERM::TLine >::const_iterator prevIt;
-	for(std::map< LinePointer, ERM::TLine >::const_iterator it = scripts.begin(); it != scripts.end(); ++it)
-	{
-		if(it == scripts.begin() || it->first.file != prevIt->first.file)
-		{
-			logger->debug("----------------- script %s ------------------", it->first.file->filename);
-		}
-
-		logger->debug("%d", it->first.realLineNum);
-		ERMPrinter::printAST(it->second);
-		prevIt = it;
-	}
-}
 
 void ERMInterpreter::scanScripts()
 {
@@ -1743,15 +2115,15 @@ IexpValStr ERMInterpreter::getIexp( const ERM::TMacroUsage & macro ) const
 	return getVar(it->second.varsym, it->second.val);
 }
 
-IexpValStr ERMInterpreter::getIexp( const ERM::TIdentifierInternal & tid ) const
-{
-	if(tid.which() == 0)
-	{
-		return getIexp(boost::get<ERM::TIexp>(tid));
-	}
-	else
-		throw EScriptExecError("Identifier must be a valid i-expression to perform this operation!");
-}
+//IexpValStr ERMInterpreter::getIexp( const ERM::TIdentifierInternal & tid ) const
+//{
+//	if(tid.which() == 0)
+//	{
+//		return getIexp(boost::get<ERM::TIexp>(tid));
+//	}
+//	else
+//		throw EScriptExecError("Identifier must be a valid i-expression to perform this operation!");
+//}
 
 IexpValStr ERMInterpreter::getIexp( const ERM::TVarpExp & tid ) const
 {
@@ -1938,6 +2310,7 @@ private:
 
 bool ERMInterpreter::checkCondition( ERM::Tcondition cond )
 {
+	//???????
 	bool ret = boost::apply_visitor(ConditionDisemboweler(this), cond.cond);
 	if(cond.rhs.is_initialized())
 	{ //taking care of rhs expression
@@ -2613,6 +2986,40 @@ JsonNode ERMInterpreter::callGlobal(ServerBattleCb * cb, const std::string & nam
 	bacb = nullptr;
 
 	return ret;
+}
+
+std::string ERMInterpreter::convert()
+{
+	std::stringstream out;
+
+	out << "local ERM = require(\"core:erm\")" << std::endl;
+
+	out << "local v = ERM.v" << std::endl;
+	out << "local z = ERM.z" << std::endl;
+	out << "local flag = ERM.flag" << std::endl;
+
+	for(const auto & p : triggers)
+	{
+		const VERMInterpreter::TriggerType & tt = p.first;
+
+		if(tt.type == VERMInterpreter::TriggerType::FU)
+		{
+			ERMConverter::convertFunctions(out, this, p.second);
+		}
+		else
+		{
+
+		}
+	}
+
+	for(const auto & p : postTriggers)
+		;//TODO
+
+	//TODO: instructions
+
+	//TODO: !?PI
+
+	return out.str();
 }
 
 void ERMInterpreter::setGlobal(const std::string & name, int value)

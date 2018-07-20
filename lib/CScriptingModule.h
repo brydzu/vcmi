@@ -19,7 +19,6 @@ namespace spells
 	}
 }
 
-
 namespace scripting
 {
 
@@ -38,7 +37,9 @@ public:
 	Module();
 	virtual ~Module();
 
-	virtual std::shared_ptr<ContextBase> createContextFor(const Script * source, const IGameInfoCallback * gameCb, const CBattleInfoCallback * battleCb) const = 0;
+	virtual std::string compile(const std::string & name, const std::string & source) const = 0;
+
+	virtual std::shared_ptr<ContextBase> createContextFor(const Script * source, const Environment * env) const = 0;
 
 	virtual void registerSpellEffect(spells::effects::Registry * registry, const Script * source) const = 0;
 };

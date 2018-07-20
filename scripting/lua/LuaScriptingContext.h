@@ -10,7 +10,7 @@
 
 #pragma once
 
-#include <lua.hpp>
+#include "LuaWrapper.h"
 
 #include "../../lib/ScriptHandler.h"
 #include "../../lib/CScriptingModule.h"
@@ -26,6 +26,12 @@ public:
 
 	void init(const IGameInfoCallback * cb, const CBattleInfoCallback * battleCb);
 
+	//no return, Lua internally throws
+	void error(const std::string & message);
+
+	//log error and return nil from LuaCFunction
+	int errorRetVoid(const std::string & message);
+
 	JsonNode callGlobal(const std::string & name, const JsonNode & parameters) override;
 	JsonNode callGlobal(ServerCb * cb, const std::string & name, const JsonNode & parameters) override;
 	JsonNode callGlobal(ServerBattleCb * cb, const std::string & name, const JsonNode & parameters) override;
@@ -35,8 +41,15 @@ public:
 	void setGlobal(const std::string & name, double value) override;
 
 	void push(const JsonNode & value);
-
 	void pop(JsonNode & value);
+
+	void popAll();
+
+	void push(const std::string & value);
+	void push(lua_CFunction f, void * opaque);
+	void push(ServerCb * cb);
+
+	std::string toStringRaw(int index);
 
 protected:
 
@@ -47,8 +60,18 @@ private:
 
 	const IGameInfoCallback * icb;
 	const CBattleInfoCallback * bicb;
-	ServerCb * acb;
 	ServerBattleCb * bacb;
+
+	void cleanupGlobals();
+
+	void registerCore();
+
+	//require global function
+	static int require(lua_State * L);
+
+	//require function implementation
+	int loadModule();
+
 };
 
 

@@ -311,6 +311,7 @@ endif()
 #######################################
 
 install(DIRECTORY config DESTINATION ${DATA_DIR})
+install(DIRECTORY scripts DESTINATION ${DATA_DIR})
 install(DIRECTORY Mods DESTINATION ${DATA_DIR})
 
 # that script is useless for Windows

@@ -357,10 +357,14 @@ namespace ERM
 			commentLine %= (~qi::char_("!") >> comment | (qi::char_('!') >> (~qi::char_("?!$#[")) >> comment ));
  			cmdName %= qi::lexeme[qi::repeat(2)[qi::char_]];
 			arithmeticOp %= iexp >> qi::char_ >> iexp;
+			//???
 			//identifier is usually a vector of i-expressions but VR receiver performs arithmetic operations on it
-			identifier %= (iexp | arithmeticOp) % qi::lit('/');
+
+			//identifier %= (iexp | arithmeticOp) % qi::lit('/');
+			identifier %= iexp % qi::lit('/');
+
 			comparison %= iexp >> (*qi::char_("<=>")) >> iexp;
-			condition %= qi::char_("&|X/") >> (comparison | qi::int_) >> -condition;
+			condition %= qi::char_("&|/") >> (comparison | qi::int_) >> -condition;
 
 			trigger %= cmdName >> -identifier >> -condition > qi::lit(";"); /////
 			string %= qi::lexeme['^' >> *(qi::char_ - '^') >> '^'];

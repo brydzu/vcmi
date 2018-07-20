@@ -38,9 +38,9 @@ ScriptImpl::ScriptImpl(const ScriptHandler * owner_)
 
 ScriptImpl::~ScriptImpl() = default;
 
-std::shared_ptr<Context> ScriptImpl::createContext(const IGameInfoCallback * gameCb, const CBattleInfoCallback * battleCb) const
+std::shared_ptr<Context> ScriptImpl::createContext(const Environment * env) const
 {
-	return host->createContextFor(this, gameCb, battleCb);
+	return host->createContextFor(this, env);
 }
 
 const std::string & ScriptImpl::getName() const
@@ -74,11 +74,20 @@ void ScriptImpl::serializeJson(JsonSerializeFormat & handler)
 	{
 		resolveHost();
 
-		ResourceID sourcePathId(sourcePath);
+		ResourceID sourcePathId("SCRIPTS/"+sourcePath);
 
 		auto rawData = CResourceHandler::get()->load(sourcePathId)->readAll();
 
 		sourceText = std::string((char *)rawData.first.get(), rawData.second);
+
+		code = host->compile(sourcePath, sourceText);
+
+		if(host == owner->erm)
+		{
+			host = owner->lua;
+			sourceText = code;
+			code = host->compile(getName(), getSource());
+		}
 	}
 }
 
@@ -86,6 +95,7 @@ void ScriptImpl::serializeJsonState(JsonSerializeFormat & handler)
 {
 	handler.serializeString("sourcePath", sourcePath);
 	handler.serializeString("sourceText", sourceText);
+	handler.serializeString("code", code);
 	handler.serializeEnum("implements", implements, Implements::ANYTHING, IMPLEMENTS_MAP);
 
 	if(!handler.saving)
@@ -106,7 +116,7 @@ void ScriptImpl::resolveHost()
 		throw std::runtime_error("Unknown script language in:"+sourcePath);
 }
 
-PoolImpl::PoolImpl(const IGameInfoCallback * gameCb_, const CBattleInfoCallback * battleCb_)
+PoolImpl::PoolImpl(const GameCb * gameCb_, const BattleCb * battleCb_)
 	: gameCb(gameCb_),
 	battleCb(battleCb_)
 {
@@ -119,7 +129,7 @@ std::shared_ptr<Context> PoolImpl::getContext(const Script * script)
 
 	if(iter == cache.end())
 	{
-		auto context = script->createContext(gameCb, battleCb);
+		auto context = script->createContext(this);
 		cache[script] = context;
 		return context;
 	}
@@ -127,6 +137,21 @@ std::shared_ptr<Context> PoolImpl::getContext(const Script * script)
 	{
 		return iter->second;
 	}
+}
+
+ const GameCb * PoolImpl::game() const
+{
+	return gameCb;
+}
+
+const BattleCb * PoolImpl::battle() const
+{
+	return battleCb;
+}
+
+::vstd::CLoggerBase * PoolImpl::logger() const
+{
+	return logMod;
 }
 
 ScriptHandler::ScriptHandler()

@@ -70,9 +70,9 @@ TEST_F(ExamplesTest, TESTY_ERM)
 
 	GTEST_ASSERT_NE(subject, nullptr);
 
-	std::shared_ptr<Context> ctx = subject->createContext(&infoMock, battleFake.get());
+	std::shared_ptr<Context> ctx = subject->createContext(&environmentMock);
 
-	JsonNode ret = ctx->callGlobal(&applierMock, "!!FU42", JsonNode());
+	JsonNode ret = ctx->callGlobal(&applierMock, "FU42", JsonNode());
 
 	JsonNode expected;
 
@@ -88,6 +88,8 @@ TEST_F(ExamplesTest, TESTY_ERM)
 		"Hello world number 4! (1)",
 		"Composed hello %world%, v2777=4, v2778=0!"
 	};
+
+	SCOPED_TRACE("\n" + subject->code);
 
 	EXPECT_THAT(actualTexts, Eq(expectedTexts));
 }
@@ -105,9 +107,9 @@ TEST_F(ExamplesTest, STD_VERM)
 
 	GTEST_ASSERT_NE(subject, nullptr);
 
-	std::shared_ptr<Context> ctx = subject->createContext(&infoMock, battleFake.get());
+	std::shared_ptr<Context> ctx = subject->createContext(&environmentMock);
 
-	JsonNode ret = ctx->callGlobal(&applierMock, "!!FU42", JsonNode());
+	JsonNode ret = ctx->callGlobal(&applierMock, "FU42", JsonNode());
 
 	JsonNode expected;
 
@@ -122,6 +124,8 @@ TEST_F(ExamplesTest, STD_VERM)
 		"Hello world from macro usage",
 		"Hello world from macro usage"
 	};
+
+	SCOPED_TRACE("\n" +subject->code);
 
 	EXPECT_THAT(actualTexts, Eq(expectedTexts));
 }

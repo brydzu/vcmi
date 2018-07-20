@@ -57,7 +57,7 @@ public:
 	virtual const std::string & getName() const = 0;
 	virtual const std::string & getSource() const = 0;
 
-	virtual std::shared_ptr<Context> createContext(const IGameInfoCallback * gameCb, const CBattleInfoCallback * battleCb) const = 0;
+	virtual std::shared_ptr<Context> createContext(const Environment * env) const = 0;
 };
 
 class DLL_LINKAGE Service

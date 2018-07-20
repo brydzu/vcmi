@@ -21,7 +21,9 @@ public:
 	LuaScriptModule();
 	virtual ~LuaScriptModule();
 
-	std::shared_ptr<ContextBase> createContextFor(const Script * source, const IGameInfoCallback * gameCb, const CBattleInfoCallback * battleCb) const override;
+	std::string compile(const std::string & name, const std::string & source) const override;
+
+	std::shared_ptr<ContextBase> createContextFor(const Script * source, const scripting::Environment * env) const override;
 
 	void registerSpellEffect(spells::effects::Registry * registry, const Script * source) const override;
 

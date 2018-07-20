@@ -42,6 +42,8 @@ public:
 	std::string sourcePath;
 	std::string sourceText;
 
+	std::string code;
+
 	ModulePtr host;
 
 	ScriptImpl(const ScriptHandler * owner_);
@@ -50,7 +52,7 @@ public:
 	void serializeJson(JsonSerializeFormat & handler);
 	void serializeJsonState(JsonSerializeFormat & handler);
 
-	std::shared_ptr<Context> createContext(const IGameInfoCallback * gameCb, const CBattleInfoCallback * battleCb) const override;
+	std::shared_ptr<Context> createContext(const Environment * env) const override;
 	const std::string & getName() const override;
 	const std::string & getSource() const override;
 
@@ -62,16 +64,20 @@ private:
 	void resolveHost();
 };
 
-class DLL_LINKAGE PoolImpl : public Pool
+class DLL_LINKAGE PoolImpl : public Pool, public Environment
 {
 public:
-	PoolImpl(const IGameInfoCallback * gameCb_, const CBattleInfoCallback * battleCb_);
+	PoolImpl(const GameCb * gameCb_, const BattleCb * battleCb_);
 	std::shared_ptr<Context> getContext(const Script * script) override;
+
+	const BattleCb * battle() const override;
+	const GameCb * game() const override;
+	::vstd::CLoggerBase * logger() const override;
 private:
 	std::map<const Script *, std::shared_ptr<Context>> cache;
 
-	const IGameInfoCallback * gameCb;
-	const CBattleInfoCallback * battleCb;
+	const GameCb * gameCb;
+	const BattleCb * battleCb;
 };
 
 class DLL_LINKAGE ScriptHandler : public ::IHandlerBase, public Service

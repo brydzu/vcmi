@@ -130,6 +130,8 @@
 		<Unit filename="../include/vstd/ContainerUtils.h" />
 		<Unit filename="../include/vstd/RNG.h" />
 		<Unit filename="../include/vstd/StringUtils.h" />
+		<Unit filename="../scripts/lib/erm.lua" />
+		<Unit filename="../scripts/lib/erm/IF.lua" />
 		<Unit filename="AI_Base.h" />
 		<Unit filename="Artifact.h" />
 		<Unit filename="CArtHandler.cpp" />

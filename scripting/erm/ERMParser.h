@@ -125,8 +125,8 @@ namespace ERM
 	};
 	typedef boost::variant<TVRLogic, TVRArithmetic, TNormalBodyOption> TBodyOption;
 
-	typedef boost::variant<TIexp, TArithmeticOp > TIdentifierInternal;
-	typedef std::vector< TIdentifierInternal > Tidentifier;
+//	typedef boost::variant<TIexp, TArithmeticOp > TIdentifierInternal;
+	typedef std::vector< TIexp > Tidentifier;
 
 	struct TComparison
 	{

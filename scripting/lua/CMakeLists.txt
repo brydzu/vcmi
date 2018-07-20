@@ -4,6 +4,11 @@ set(lib_SRCS
 		StdInc.cpp
 		LuaScriptModule.cpp
 		LuaScriptingContext.cpp
+		LuaSpellEffect.cpp
+
+		api/Registry.cpp
+		api/ServerCb.cpp
+		api/netpacks/InfoWindow.cpp
 )
 
 add_library(vcmiLua SHARED ${lib_SRCS})

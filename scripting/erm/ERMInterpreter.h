@@ -182,7 +182,10 @@ namespace VERMInterpreter
 	{
 		//the same order of trigger types in this enum and in validTriggers array is obligatory!
 		enum ETrigType{AE, BA, BF, BG, BR, CM, CO, FU, GE, GM, HE, HL, HM, IP, LE, MF, MG, MM, MR,
-			MW, OB, PI, SN, TH, TM} type;
+			MW, OB, PI, SN, TH, TM};
+
+		ETrigType type;
+
 		static ETrigType convertTrigger(const std::string & trig)
 		{
 			static const std::string validTriggers[] = {"AE", "BA", "BF", "BG", "BR", "CM", "CO", "FU",
@@ -793,9 +796,9 @@ class ERMInterpreter : public ::scripting::ContextBase, public IGameEventsReceiv
 // 	friend struct VRPerformer;
 
 	std::vector<VERMInterpreter::FileInfo*> files;
-	std::vector< VERMInterpreter::FileInfo* > fileInfos;
+
 	std::map<VERMInterpreter::LinePointer, ERM::TLine> scripts;
-//	std::map<VERMInterpreter::LexicalPtr, VERMInterpreter::Environment> lexicalEnvs;
+
 	ERM::TLine &retrieveLine(VERMInterpreter::LinePointer linePtr);
 	static ERM::TTriggerBase & retrieveTrigger(ERM::TLine &line);
 
@@ -814,7 +817,7 @@ class ERMInterpreter : public ::scripting::ContextBase, public IGameEventsReceiv
 
 	IexpValStr getIexp(const ERM::TIexp & iexp) const;
 	IexpValStr getIexp(const ERM::TMacroUsage & macro) const;
-	IexpValStr getIexp(const ERM::TIdentifierInternal & tid) const;
+//	IexpValStr getIexp(const ERM::TIdentifierInternal & tid) const;
 	IexpValStr getIexp(const ERM::TVarpExp & tid) const;
 	IexpValStr getIexp(const ERM::TBodyOptionItem & opit) const;
 
@@ -848,8 +851,6 @@ public:
 	void executeTriggerType(const char *trigger); //convenience version of above, for pre-trigger when there are no args
 	void setCurrentlyVisitedObj(int3 pos); //sets v998 - v1000 to given value
 
-	enum EPrintMode{ALL, ERM_ONLY, VERM_ONLY};
-	void printScripts(EPrintMode mode = ALL);
 	void scanScripts(); //scans for functions, triggers etc.
 
 	ERMInterpreter(vstd::CLoggerBase * logger_);
@@ -858,6 +859,8 @@ public:
 	int getRealLine(const VERMInterpreter::LinePointer &lp);
 
 	void loadScript(const std::string & name, const std::string & source);
+
+	std::string convert();
 
 	JsonNode callGlobal(const std::string & name, const JsonNode & parameters) override;
 	JsonNode callGlobal(VERMInterpreter::ServerCb * cb, const std::string & name, const JsonNode & parameters) override;

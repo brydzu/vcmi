@@ -33,12 +33,22 @@ ERMScriptModule::ERMScriptModule()
 
 }
 
-std::shared_ptr<scripting::ContextBase> ERMScriptModule::createContextFor(const scripting::Script * source, const IGameInfoCallback * gameCb, const CBattleInfoCallback * battleCb) const
+std::string ERMScriptModule::compile(const std::string & name, const std::string & source) const
 {
-	std::shared_ptr<ERMInterpreter> ret = std::make_shared<ERMInterpreter>(logMod);
+	std::shared_ptr<ERMInterpreter> interp = std::make_shared<ERMInterpreter>(logMod);
+
+	interp->loadScript(name, source);
+	interp->scanScripts();
+
+	return interp->convert();
+}
+
+std::shared_ptr<scripting::ContextBase> ERMScriptModule::createContextFor(const scripting::Script * source, const scripting::Environment * env) const
+{
+	std::shared_ptr<ERMInterpreter> ret = std::make_shared<ERMInterpreter>(env->logger());
 
 	ret->loadScript(source->getName(), source->getSource());
-	ret->init(gameCb, battleCb);
+	ret->init(env->game(), env->battle());
 
 	return ret;
 }

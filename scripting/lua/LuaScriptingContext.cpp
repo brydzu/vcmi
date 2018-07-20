@@ -11,12 +11,18 @@
 
 #include "LuaScriptingContext.h"
 
+#include <vstd/StringUtils.h>
+
+#include "api/Registry.h"
+
+#include "api/ServerCb.h"
+
 #include "../../lib/JsonNode.h"
 #include "../../lib/NetPacks.h"
+#include "../../lib/filesystem/Filesystem.h"
 
 namespace scripting
 {
-
 
 LuaContext::LuaContext(vstd::CLoggerBase * logger_, const Script * source)
 	: ContextBase(logger_),
@@ -24,16 +30,39 @@ LuaContext::LuaContext(vstd::CLoggerBase * logger_, const Script * source)
 {
 	L = luaL_newstate();
 
-	luaopen_base(L); //FIXME: disable filesystem access
+	luaopen_base(L);
 
 	luaopen_math(L);
 	luaopen_string(L);
 	luaopen_table(L);
+	luaopen_bit(L);
+
+	cleanupGlobals();
+
+	registerCore();
 }
 
 LuaContext::~LuaContext()
 {
 	lua_close(L);
+}
+
+void LuaContext::cleanupGlobals()
+{
+	lua_pushnil(L);
+	lua_setglobal(L, "collectgarbage");
+
+	lua_pushnil(L);
+	lua_setglobal(L, "dofile");
+
+	lua_pushnil(L);
+	lua_setglobal(L, "load");
+
+	lua_pushnil(L);
+	lua_setglobal(L, "loadfile");
+
+	lua_pushnil(L);
+	lua_setglobal(L, "loadstring");
 }
 
 void LuaContext::init(const IGameInfoCallback * cb, const CBattleInfoCallback * battleCb)
@@ -45,8 +74,8 @@ void LuaContext::init(const IGameInfoCallback * cb, const CBattleInfoCallback * 
 
 	if(ret)
 	{
-		logger->error("Script %s failed to load, error: ", script->getName(), lua_tostring(L, -1));
-
+		logger->error("Script '%s' failed to load, error: %s", script->getName(), toStringRaw(-1));
+		popAll();
 		return;
 	}
 
@@ -54,15 +83,39 @@ void LuaContext::init(const IGameInfoCallback * cb, const CBattleInfoCallback * 
 
 	if(ret)
 	{
-		logger->error("Script failed to run, error: ", lua_tostring(L, -1));
-
+		logger->error("Script '%s' failed to run, error: %s", script->getName(), toStringRaw(-1));
+		popAll();
 		return;
 	}
+}
+
+void LuaContext::error(const std::string & message)
+{
+	//do not log here
+	push(message);
+	lua_error(L);
+}
+
+int LuaContext::errorRetVoid(const std::string & message)
+{
+	logger->error(message);
+	popAll();
+	return 0;
 }
 
 JsonNode LuaContext::callGlobal(const std::string & name, const JsonNode & parameters)
 {
 	lua_getglobal(L, name.c_str());
+
+	if(!lua_isfunction(L, -1))
+	{
+		boost::format fmt("%s is not a function");
+		fmt % name;
+
+		logger->error(fmt.str());
+
+		return JsonUtils::stringNode(fmt.str());
+	}
 
 	int argc = parameters.Vector().size();
 
@@ -73,6 +126,7 @@ JsonNode LuaContext::callGlobal(const std::string & name, const JsonNode & param
 			push(parameters.Vector()[idx]);
 		}
 	}
+
 
 	if(lua_pcall(L, argc, 1, 0))
 	{
@@ -95,11 +149,13 @@ JsonNode LuaContext::callGlobal(const std::string & name, const JsonNode & param
 
 JsonNode LuaContext::callGlobal(ServerCb * cb, const std::string & name, const JsonNode & parameters)
 {
-	acb = cb;
+	push(cb);
+	lua_setglobal(L, "SERVER");
 
 	auto ret = callGlobal(name, parameters);
 
-	acb = nullptr;
+	lua_pushnil(L);
+	lua_setglobal(L, "SERVER");
 
 	return ret;
 }
@@ -167,9 +223,7 @@ void LuaContext::push(const JsonNode & value)
 		}
 		break;
 	case JsonNode::JsonType::DATA_STRING:
-		{
-			lua_pushlstring(L, value.String().c_str(), value.String().size());
-		}
+		push(value.String());
 		break;
 	case JsonNode::JsonType::DATA_VECTOR:
 		{
@@ -204,17 +258,11 @@ void LuaContext::pop(JsonNode & value)
 		value.Bool() = lua_toboolean(L, -1);
 		break;
 	case LUA_TSTRING:
-		{
-			size_t len = 0;
-
-			auto raw = lua_tolstring(L, -1, &len);
-
-			value.String() = std::string(raw, len);
-		}
-
+		value.String() = toStringRaw(-1);
 		break;
 	case LUA_TTABLE:
 		value.clear(); //TODO:
+		error("Not implemented");
 		break;
 	default:
 		value.clear();
@@ -223,6 +271,142 @@ void LuaContext::pop(JsonNode & value)
 
 	lua_pop(L, 1);
 }
+
+void LuaContext::push(const std::string & value)
+{
+	lua_pushlstring(L, value.c_str(), value.size());
+}
+
+void LuaContext::push(lua_CFunction f, void * opaque)
+{
+	lua_pushlightuserdata(L, opaque);
+	lua_pushcclosure(L, f, 1);
+}
+
+void LuaContext::push(ServerCb * cb)
+{
+	api::ServerCbProxy::Wrapper::push(L, cb);
+}
+
+void LuaContext::popAll()
+{
+	lua_settop(L, 0);
+}
+
+std::string LuaContext::toStringRaw(int index)
+{
+	size_t len = 0;
+	auto raw = lua_tolstring(L, index, &len);
+	return std::string(raw, len);
+}
+
+void LuaContext::registerCore()
+{
+	push(&LuaContext::require, this);
+	lua_setglobal(L, "require");
+
+	api::ServerCbProxy::Wrapper::registrator(L);
+}
+
+int LuaContext::require(lua_State * L)
+{
+	LuaContext * self = static_cast<LuaContext *>(lua_touserdata(L, lua_upvalueindex(1)));
+
+	if(!self)
+	{
+		lua_pushstring(L, "internal error");
+		lua_error(L);
+		return 0;
+	}
+
+	return self->loadModule();
+}
+
+int LuaContext::loadModule()
+{
+	int argc = lua_gettop(L);
+
+	if(argc < 1)
+		return errorRetVoid("Module name required");
+
+	if(!lua_isstring(L, 1))
+		return errorRetVoid("Module name must be string");
+
+	std::string resourceName = toStringRaw(1);
+	popAll();
+
+	if(resourceName.empty())
+		return errorRetVoid("Module name is empty");
+
+	auto temp = vstd::split(resourceName, ":");
+
+	std::string scope;
+	std::string modulePath;
+
+	if(temp.size() <= 1)
+	{
+		modulePath = temp.at(0);
+	}
+	else
+	{
+		scope = temp.at(0);
+		modulePath = temp.at(1);
+	}
+
+	if(scope.empty())
+	{
+		auto registar = api::Registry::get()->find(modulePath);
+
+		if(!registar)
+		{
+			return errorRetVoid("Module not found: "+modulePath);
+		}
+
+		registar->perform(L);
+	}
+	else if(scope == "core")
+	{
+
+	//	boost::algorithm::replace_all(modulePath, boost::is_any_of("\\/ "), "");
+
+		boost::algorithm::replace_all(modulePath, ".", "/");
+
+		auto loader = CResourceHandler::get("core");
+
+		modulePath = "scripts/lib/" + modulePath;
+
+		ResourceID id(modulePath, EResType::LUA);
+
+		if(!loader->existsResource(id))
+			return errorRetVoid("Module not found "+modulePath);
+
+		auto rawData = loader->load(id)->readAll();
+
+		auto sourceText = std::string((char *)rawData.first.get(), rawData.second);
+
+		int ret = luaL_loadbuffer(L, sourceText.c_str(), sourceText.size(), modulePath.c_str());
+
+		if(ret)
+			return errorRetVoid(toStringRaw(-1));
+
+		ret = lua_pcall(L, 0, LUA_MULTRET, 0);
+
+		if(ret)
+		{
+			logger->error("Module '%s' failed to run, error: %s", modulePath, toStringRaw(-1));
+			popAll();
+		}
+	}
+	else
+	{
+		//todo: also allow loading scripts from same scope
+		return errorRetVoid("No access to scope "+scope);
+	}
+
+
+	return lua_gettop(L);
+}
+
 
 
 }
