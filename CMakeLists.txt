@@ -45,6 +45,7 @@ set(VCMI_VERSION_MINOR 99)
 set(VCMI_VERSION_PATCH 0)
 
 option(ENABLE_ERM "Enable compilation of ERM scripting module" ON)
+option(ENABLE_LUA "Enable compilation of LUA scripting module" ON)
 option(ENABLE_LAUNCHER "Enable compilation of launcher" ON)
 option(ENABLE_TEST "Enable compilation of unit tests" ON)
 option(ENABLE_PCH "Enable compilation using precompiled headers" ON)
@@ -227,6 +228,16 @@ if(ENABLE_LAUNCHER)
 	find_package(Qt5Network REQUIRED)
 endif()
 
+if(ENABLE_LUA)
+	find_package(LuaJIT)
+	if(LUAJIT_FOUND)
+		message(STATUS "Using LuaJIT provided by system")
+	else()
+		message(STATUS "Cannot find LuaJIT! Fallback to using usual Lua.")
+		find_package(Lua REQUIRED)
+	endif()
+endif()
+
 ############################################
 #        Output directories                #
 ############################################
@@ -289,6 +300,9 @@ set(SCRIPTING_LIB_DIR "${LIB_DIR}/scripting")
 
 if(ENABLE_ERM)
 	add_subdirectory(scripting/erm)
+endif()
+if(ENABLE_LUA)
+	add_subdirectory(scripting/lua)
 endif()
 if(NOT MINIZIP_FOUND)
 	add_subdirectory_with_folder("3rdparty" lib/minizip)

@@ -10,6 +10,8 @@ set(lib_SRCS
 add_library(vcmiERM SHARED ${lib_SRCS})
 target_link_libraries(vcmiERM ${Boost_LIBRARIES} vcmi)
 
+vcmi_set_output_dir(vcmiERM "scripting")
+
 set_target_properties(vcmiERM PROPERTIES ${PCH_PROPERTIES})
 cotire(vcmiERM)
 

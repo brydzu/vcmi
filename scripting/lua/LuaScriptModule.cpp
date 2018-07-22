@@ -13,6 +13,10 @@
 #include "LuaScriptingContext.h"
 #include "LuaSpellEffect.h"
 
+#ifdef __GNUC__
+#define strcpy_s(a, b, c) strncpy(a, c, b)
+#endif
+
 const char *g_cszAiName = "Lua interpreter";
 
 extern "C" DLL_EXPORT void GetAiName(char * name)
