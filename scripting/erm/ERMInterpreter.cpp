@@ -643,18 +643,42 @@ namespace ERMConverter
 
 		void operator()(Treceiver const & trig) const
 		{
-			if(trig.condition.is_initialized())
+			if(trig.name=="if")
 			{
-				convertCondition(trig.condition.get());
-
-				convert(trig.name, trig.identifier, trig.body);
-
+				if(trig.condition.is_initialized())
+				{
+					convertCondition(trig.condition.get());
+				}
+				else
+				{
+					(*out) << "if true then" << std::endl;
+				}
+			}
+			else if(trig.name=="el")
+			{
+				(*out) << "else" << std::endl;
+			}
+			else if(trig.name=="en")
+			{
 				(*out) << "end" << std::endl;
 			}
 			else
 			{
-				convert(trig.name, trig.identifier, trig.body);
+				if(trig.condition.is_initialized())
+				{
+					convertCondition(trig.condition.get());
+
+					convert(trig.name, trig.identifier, trig.body);
+
+					(*out) << "end" << std::endl;
+				}
+				else
+				{
+					convert(trig.name, trig.identifier, trig.body);
+				}
 			}
+
+
 		}
 	};
 

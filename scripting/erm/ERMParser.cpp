@@ -378,10 +378,10 @@ namespace ERM
 			exactBodyOptionList %= (bodyOptionItem % qi::lit("/"));
 			normalBodyOption = qi::char_("A-Z+") > exactBodyOptionList;
 			bodyOption %= VRLogic | VRarithmetic | normalBodyOption;
-			body %= qi::lit(":") >> +(bodyOption) > qi::lit(";");
+			body %= qi::lit(":") >> *(bodyOption) > qi::lit(";");
 
 			instruction %= cmdName >> -identifier >> -condition >> body;
-			receiver %= cmdName >> -identifier >> -condition >> -body; //receiver without body exists... change needed
+			receiver %= cmdName >> -identifier >> -condition >> body; //receiver without body exists... change needed
 			postTrigger %= cmdName >> -identifier >> -condition > qi::lit(";");
 
 			command %= (qi::lit("!") >>
