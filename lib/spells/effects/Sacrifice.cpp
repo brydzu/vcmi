@@ -120,7 +120,7 @@ bool Sacrifice::applicable(Problem & problem, const Mechanics * m, const EffectT
 	return true;
 }
 
-void Sacrifice::apply(BattleStateProxy * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const
+void Sacrifice::apply(ServerBattleCb * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const
 {
 	if(target.size() != 2)
 	{

@@ -34,7 +34,7 @@ Clone::Clone()
 
 Clone::~Clone() = default;
 
-void Clone::apply(BattleStateProxy * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const
+void Clone::apply(ServerBattleCb * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const
 {
 	for(const Destination & dest : target)
 	{

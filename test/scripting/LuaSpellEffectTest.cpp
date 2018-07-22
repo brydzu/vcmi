@@ -16,6 +16,8 @@
 #include "../mock/mock_scripting_Script.h"
 #include "../mock/mock_scripting_Service.h"
 #include "../mock/mock_spells_effects_Registry.h"
+#include "../mock/mock_IBattleEventRealizer.h"
+
 #include "../../../lib/VCMI_Lib.h"
 #include "../../../lib/ScriptHandler.h"
 #include "../../../lib/CScriptingModule.h"
@@ -45,6 +47,7 @@ public:
 
 	RegistryMock registryMock;
 	RegistryMock::FactoryPtr factory;
+	StrictMock<IBattleEventRealizerMock> battleServer;
 
 	JsonNode request;
 
@@ -85,7 +88,15 @@ public:
 //		EffectFixture::setupEffect(options);
 	}
 
-	JsonNode saveRequest(const std::string & name, const JsonNode & parameters)
+	JsonNode saveRequest(const std::string &, const JsonNode & parameters)
+	{
+		JsonNode response = JsonUtils::boolNode(true);
+
+		request = parameters;
+		return response;
+	}
+
+	JsonNode saveRequest2(IBattleEventRealizer *, const std::string &, const JsonNode & parameters)
 	{
 		JsonNode response = JsonUtils::boolNode(true);
 
@@ -158,6 +169,40 @@ TEST_F(LuaSpellEffectTest, ApplicableTargetRedirected)
 
 	JsonComparer c(false);
 	c.compare("applicableTarget request", request, expected);
+}
+
+TEST_F(LuaSpellEffectTest, ApplyRedirected)
+{
+	setDefaultExpectations();
+
+	EXPECT_CALL(*contextMock, callGlobal(Matcher<IBattleEventRealizer *>(Eq(&battleServer)), Eq("apply"),_)).WillOnce(Invoke(this, &LuaSpellEffectTest::saveRequest2));
+
+	auto & unit1 = unitsFake.add(BattleSide::ATTACKER);
+
+	EffectTarget target;
+
+	BattleHex hex1(6,7);
+
+	int32_t id1 = 42;
+
+	EXPECT_CALL(unit1, unitId()).WillOnce(Return(id1));
+
+	target.emplace_back(&unit1, hex1);
+
+	subject->apply(&battleServer, rngMock, &mechanicsMock, target);
+
+	JsonNode first;
+	first.Vector().push_back(JsonUtils::intNode(hex1.hex));
+	first.Vector().push_back(JsonUtils::intNode(id1));
+
+	JsonNode targets;
+	targets.Vector().push_back(first);
+
+	JsonNode expected;
+	expected.Vector().push_back(targets);
+
+	JsonComparer c(false);
+	c.compare("apply request", request, expected);
 }
 
 }

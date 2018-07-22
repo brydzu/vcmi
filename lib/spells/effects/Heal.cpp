@@ -40,12 +40,12 @@ Heal::Heal()
 
 Heal::~Heal() = default;
 
-void Heal::apply(BattleStateProxy * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const
+void Heal::apply(ServerBattleCb * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const
 {
 	apply(m->getEffectValue(), battleState, rng, m, target);
 }
 
-void Heal::apply(int64_t value, BattleStateProxy * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const
+void Heal::apply(int64_t value, ServerBattleCb * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const
 {
 	BattleUnitsChanged pack;
 	prepareHealEffect(value, pack, rng, m, target);

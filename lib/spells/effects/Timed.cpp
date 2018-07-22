@@ -36,10 +36,10 @@ Timed::Timed()
 
 Timed::~Timed() = default;
 
-void Timed::apply(BattleStateProxy * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const
+void Timed::apply(ServerBattleCb * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const
 {
 	SetStackEffect sse;
-	prepareEffects(sse, m, target, battleState->describe);
+	prepareEffects(sse, m, target, battleState->describeChanges());
 
 	if(!(sse.toAdd.empty() && sse.toUpdate.empty()))
 		battleState->apply(&sse);

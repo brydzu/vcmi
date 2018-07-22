@@ -53,7 +53,7 @@ public:
 
 	EffectTarget transformTarget(const Mechanics * m, const Target & aimPoint, const Target & spellTarget) const override;
 
-	void apply(BattleStateProxy * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const override;
+	void apply(ServerBattleCb * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const override;
 
 protected:
 	void serializeJsonEffect(JsonSerializeFormat & handler) override;
@@ -72,7 +72,7 @@ private:
 	static bool isHexAvailable(const CBattleInfoCallback * cb, const BattleHex & hex, const bool mustBeClear);
 	static bool noRoomToPlace(Problem & problem, const Mechanics * m);
 
-	void placeObstacles(BattleStateProxy * battleState, const Mechanics * m, const EffectTarget & target) const;
+	void placeObstacles(ServerBattleCb * battleState, const Mechanics * m, const EffectTarget & target) const;
 };
 
 }

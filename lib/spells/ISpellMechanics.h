@@ -59,11 +59,11 @@ public:
 namespace spells
 {
 
-class DLL_LINKAGE BattleStateProxy : public IBattleEventRealizer
+using ServerBattleCb = ::IBattleEventRealizer;
+
+class DLL_LINKAGE BattleStateProxy : public ServerBattleCb
 {
 public:
-	const bool describe;
-
 	BattleStateProxy(const PacketSender * server_);
 	BattleStateProxy(IBattleState * battleState_);
 
@@ -76,7 +76,9 @@ public:
 			pack->applyBattle(battleState);
 	}
 
-	void complain(const std::string & problem) const;
+	bool describeChanges() const override;
+
+	void complain(const std::string & problem) const override;
 
 	void apply(BattleStackMoved * pack) override;
 	void apply(BattleUnitsChanged * pack) override;
@@ -86,6 +88,7 @@ public:
 	void apply(CatapultAttack * pack) override;
 
 private:
+	const bool describe;
 	const PacketSender * server;
 	IBattleState * battleState;
 };
@@ -218,7 +221,7 @@ public:
 	virtual bool canBeCast(Problem & problem) const = 0;
 	virtual bool canBeCastAt(Problem & problem, const Target & target) const = 0;
 
-	virtual void applyEffects(BattleStateProxy * battleState, vstd::RNG & rng, const Target & targets, bool indirect, bool ignoreImmunity) const = 0;
+	virtual void applyEffects(ServerBattleCb * battleState, vstd::RNG & rng, const Target & targets, bool indirect, bool ignoreImmunity) const = 0;
 
 	virtual void cast(const PacketSender * server, vstd::RNG & rng, const Target & target) = 0;
 

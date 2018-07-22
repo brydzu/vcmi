@@ -25,7 +25,7 @@ public:
 	BattleSpellMechanics(const IBattleCast * event, std::shared_ptr<effects::Effects> effects_, std::shared_ptr<IReceptiveCheck> targetCondition_);
 	virtual ~BattleSpellMechanics();
 
-	void applyEffects(BattleStateProxy * battleState, vstd::RNG & rng, const Target & targets, bool indirect, bool ignoreImmunity) const override;
+	void applyEffects(ServerBattleCb * battleState, vstd::RNG & rng, const Target & targets, bool indirect, bool ignoreImmunity) const override;
 
 	bool canBeCast(Problem & problem) const override;
 	bool canBeCastAt(Problem & problem, const Target & target) const override;

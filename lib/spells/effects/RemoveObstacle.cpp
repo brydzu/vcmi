@@ -49,7 +49,7 @@ bool RemoveObstacle::applicable(Problem & problem, const Mechanics * m, const Ef
 	return !getTargets(m, target, false).empty();
 }
 
-void RemoveObstacle::apply(BattleStateProxy * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const
+void RemoveObstacle::apply(ServerBattleCb * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const
 {
 	BattleObstaclesChanged pack;
 

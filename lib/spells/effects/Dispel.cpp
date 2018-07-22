@@ -35,10 +35,10 @@ Dispel::Dispel()
 
 Dispel::~Dispel() = default;
 
-void Dispel::apply(BattleStateProxy * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const
+void Dispel::apply(ServerBattleCb * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const
 {
 	SetStackEffect sse;
-	prepareEffects(sse, rng, m, target, battleState->describe);
+	prepareEffects(sse, rng, m, target, battleState->describeChanges());
 
 	if(!sse.toRemove.empty())
 		battleState->apply(&sse);

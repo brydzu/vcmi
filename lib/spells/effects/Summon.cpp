@@ -96,7 +96,7 @@ bool Summon::applicable(Problem & problem, const Mechanics * m) const
 	return true;
 }
 
-void Summon::apply(BattleStateProxy * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const
+void Summon::apply(ServerBattleCb * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const
 {
 	//new feature - percentage bonus
 	auto valueWithBonus = m->applySpecificSpellBonus(m->calculateRawEffectValue(0, m->getEffectPower()));//TODO: consider use base power too

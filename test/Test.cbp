@@ -101,6 +101,7 @@
 		<Unit filename="mock/mock_BonusBearer.h" />
 		<Unit filename="mock/mock_Creature.h" />
 		<Unit filename="mock/mock_CreatureService.h" />
+		<Unit filename="mock/mock_IBattleEventRealizer.h" />
 		<Unit filename="mock/mock_IGameCallback.cpp" />
 		<Unit filename="mock/mock_IGameCallback.h" />
 		<Unit filename="mock/mock_IGameEventCallback.h" />

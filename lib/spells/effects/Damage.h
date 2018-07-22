@@ -25,7 +25,7 @@ public:
 	Damage();
 	virtual ~Damage();
 
-	void apply(BattleStateProxy * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const override;
+	void apply(ServerBattleCb * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const override;
 
 protected:
 	bool isReceptive(const Mechanics * m, const battle::Unit * unit) const override;

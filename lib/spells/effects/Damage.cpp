@@ -39,10 +39,10 @@ Damage::Damage()
 
 Damage::~Damage() = default;
 
-void Damage::apply(BattleStateProxy * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const
+void Damage::apply(ServerBattleCb * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const
 {
 	StacksInjured stacksInjured;
-	prepareEffects(stacksInjured, rng, m, target, battleState->describe);
+	prepareEffects(stacksInjured, rng, m, target, battleState->describeChanges());
 	if(!stacksInjured.stacks.empty())
 		battleState->apply(&stacksInjured);
 }

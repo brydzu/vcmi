@@ -188,7 +188,7 @@ EffectTarget Obstacle::transformTarget(const Mechanics * m, const Target & aimPo
 	return ret;
 }
 
-void Obstacle::apply(BattleStateProxy * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const
+void Obstacle::apply(ServerBattleCb * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const
 {
 	if(m->isMassive())
 	{
@@ -274,7 +274,7 @@ bool Obstacle::noRoomToPlace(Problem & problem, const Mechanics * m)
 	return false;
 }
 
-void Obstacle::placeObstacles(BattleStateProxy * battleState, const Mechanics * m, const EffectTarget & target) const
+void Obstacle::placeObstacles(ServerBattleCb * battleState, const Mechanics * m, const EffectTarget & target) const
 {
 	const ObstacleSideOptions & options = sideOptions.at(m->casterSide);
 

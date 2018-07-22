@@ -30,7 +30,7 @@ public:
 	Timed();
 	virtual ~Timed();
 
-	void apply(BattleStateProxy * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const override;
+	void apply(ServerBattleCb * battleState, RNG & rng, const Mechanics * m, const EffectTarget & target) const override;
 
 protected:
 	void serializeJsonUnitEffect(JsonSerializeFormat & handler) override final;

@@ -147,6 +147,11 @@ BattleStateProxy::BattleStateProxy(IBattleState * battleState_)
 {
 }
 
+bool BattleStateProxy::describeChanges() const
+{
+	return describe;
+}
+
 void BattleStateProxy::complain(const std::string & problem) const
 {
 	if(server)
