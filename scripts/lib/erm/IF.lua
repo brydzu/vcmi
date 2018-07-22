@@ -2,6 +2,22 @@ local InfoWindow = require("netpacks.InfoWindow")
 
 local IF = {}
 
+--[[
+according to the ERM help:
+"%%" -> "%"
+"%F#" -> current value of # flag.
+"%Vf"..."%Vt" -> current value of corresponding variable.
+"%W1"..."%W100" -> current value of corresponding hero variable.
+"%X1"..."%X16" -> current value of corresponding function parameter.
+"%Y1"..."%Y100" -> current value of corresponding local variable.
+"%Z1"..."%Z500" -> current value of corresponding string variable.
+"%$macro$" -> macro name of corresponding variable
+"%Dd" -> current day of week
+"%Dw" -> current week
+"%Dm" -> current month
+"%Da" -> current day from beginning of the game
+"%Gc" -> the color of current gamer in text
+]]
 local IF_M = function(x, message)
 
 	local pack = InfoWindow.new()
@@ -19,6 +35,10 @@ local IF_M = function(x, message)
 
 		if key1 == 'Z' then
 			return IF.ERM.z[key2]
+		end
+
+		if key1 == 'F' then
+			return IF.ERM.flag[key2]
 		end
 
 		return nil

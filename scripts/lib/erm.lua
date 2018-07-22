@@ -1,4 +1,12 @@
-local ERM = {}
+
+
+local ERM =
+{
+	flag = {},
+	v = {},
+	x = {},
+	z = {}
+}
 
 local y = {}
 
@@ -7,13 +15,7 @@ ERM.getY = function(key)
 	return y[key]
 end
 
-ERM.flag = {}
-ERM.v = {}
-ERM.z = {}
-
-
 local __IF = nil
-
 
 ERM.IF = function(...)
 	__IF = __IF or require("core:erm.IF")

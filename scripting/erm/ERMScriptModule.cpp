@@ -45,12 +45,7 @@ std::string ERMScriptModule::compile(const std::string & name, const std::string
 
 std::shared_ptr<scripting::ContextBase> ERMScriptModule::createContextFor(const scripting::Script * source, const scripting::Environment * env) const
 {
-	std::shared_ptr<ERMInterpreter> ret = std::make_shared<ERMInterpreter>(env->logger());
-
-	ret->loadScript(source->getName(), source->getSource());
-	ret->init(env->game(), env->battle());
-
-	return ret;
+	throw std::runtime_error("ERM context creation is not possible");
 }
 
 void ERMScriptModule::registerSpellEffect(spells::effects::Registry * registry, const scripting::Script * source) const

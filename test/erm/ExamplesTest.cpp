@@ -118,11 +118,11 @@ TEST_F(ExamplesTest, STD_VERM)
 
 	std::vector<std::string> expectedTexts =
 	{
-		"Hello world from macro def",
-		"Hello world from macro usage",
-		"Hello world from macro usage",
-		"Hello world from macro usage",
-		"Hello world from macro usage"
+		"Hello world!",
+		"5",
+		"2>1",
+		"x<=y",
+		"40320"
 	};
 
 	SCOPED_TRACE("\n" +subject->code);

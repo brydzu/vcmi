@@ -391,10 +391,7 @@ namespace VERMInterpreter
 		}
 	};
 
-	//VFunc
 	struct VFunc;
-
-	//VOption & stuff
 
 	typedef boost::variant<VNIL, boost::recursive_wrapper<VNode>, VSymbol, TLiteral, ERM::Tcommand, boost::recursive_wrapper<VFunc> > VOption; //options in v-expression, VNIl should be the default
 
@@ -415,50 +412,6 @@ namespace VERMInterpreter
 		else
 			return false;
 	}
-
-	//why it doesn't work?
-// 	template<typename TBasicVariant>
-// 	struct IntVarinant : public TBasicVariant
-// 	{
-// 		template<typename T>
-// 		bool isA() const
-// 		{
-// 			return type() == typeid(T);
-// 		}
-// 		template<typename T>
-// 		T getAs()
-// 		{
-// 			if(isA<T>())
-// 				return boost::get<T>(*this);
-// 			else
-// 				throw EVermScriptExecError("Getting improved variant with wrongly specified type");
-// 		}
-//
-// 		IntVarinant(const VNode & val) : TBasicVariant(val)
-// 		{}
-// 		IntVarinant(const VNIL & val) : TBasicVariant(val)
-// 		{}
-// 		IntVarinant(const TLiteral & val) : TBasicVariant(val)
-// 		{}
-// 		IntVarinant(const VSymbol & val) : TBasicVariant(val)
-// 		{}
-// 		IntVarinant(const int & val) : TBasicVariant(val)
-// 		{}
-// 		IntVarinant(const char & val) : TBasicVariant(val)
-// 		{}
-// 		IntVarinant(const double & val) : TBasicVariant(val)
-// 		{}
-// 		IntVarinant(const ERM::Tcommand & val) : TBasicVariant(val)
-// 		{}
-// 		TBasicVariant & getAsPlaintVariant()
-// 		{
-// 			return *this;
-// 		}
-//
-// 		IntVarinant()
-// 		{}
-// 	};
-
 
 
 	///main environment class, manages symbols
@@ -481,18 +434,6 @@ namespace VERMInterpreter
 		enum EUnbindMode{LOCAL, RECURSIVE_UNTIL_HIT, FULLY_RECURSIVE};
 		///returns true if symbol was really unbound
 		bool unbind(const std::string & name, EUnbindMode mode);
-
-		template <typename T>
-		void localBindLiteral(const std::string & name, const T & value)
-		{
-			TLiteral val;
-			val = value;
-
-			VOption sym;
-			sym = val;
-
-			localBind(name, sym);
-		}
 
 		void localBind(std::string name, const VOption & sym);
 		void bindAtFirstHit(std::string name, const VOption & sym); //if symbol is locally defines, it gets overwritten; otherwise it is bind globally
@@ -606,16 +547,6 @@ namespace VERMInterpreter
 
 	void printVOption(const VOption & opt);
 }
-
-struct TriggerIdentifierMatch
-{
-	bool allowNoIdetifier;
-	std::map< int, std::vector<int> > matchToIt; //match subidentifiers to these numbers
-
-	static const int MAX_SUBIDENTIFIERS = 16;
-	ERMInterpreter * ermEnv;
-	bool tryMatch(VERMInterpreter::Trigger * interptrig) const;
-};
 
 struct IexpValStr
 {
@@ -783,17 +714,10 @@ public:
 	OPERATOR_DEFINITION_INTEGER(%)
 };
 
-class ERMInterpreter : public ::scripting::ContextBase, public IGameEventsReceiver, public IBattleEventsReceiver
+class ERMInterpreter
 {
 /*not so*/ public:
 // 	friend class ScriptScanner;
-// 	friend class TriggerIdMatchHelper;
-// 	friend class TriggerIdentifierMatch;
-// 	friend class ConditionDisemboweler;
-// 	friend struct LVL2IexpDisemboweler;
-// 	friend struct VR_SPerformer;
-// 	friend struct ERMExpDispatch;
-// 	friend struct VRPerformer;
 
 	std::vector<VERMInterpreter::FileInfo*> files;
 
@@ -815,12 +739,6 @@ class ERMInterpreter : public ::scripting::ContextBase, public IGameEventsReceiv
 	VERMInterpreter::FunctionLocalVars funcVars[TRIG_FUNC_NUM + 1]; //+1 because we use [0] as a global set of y-vars
 	VERMInterpreter::FunctionLocalVars * getFuncVars(int funNum); //0 is a global func-like set
 
-	IexpValStr getIexp(const ERM::TIexp & iexp) const;
-	IexpValStr getIexp(const ERM::TMacroUsage & macro) const;
-//	IexpValStr getIexp(const ERM::TIdentifierInternal & tid) const;
-	IexpValStr getIexp(const ERM::TVarpExp & tid) const;
-	IexpValStr getIexp(const ERM::TBodyOptionItem & opit) const;
-
 	static const std::string triggerSymbol, postTriggerSymbol, defunSymbol;
 
 	void executeLine(const VERMInterpreter::LinePointer & lp);
@@ -837,19 +755,10 @@ class ERMInterpreter : public ::scripting::ContextBase, public IGameEventsReceiv
 	VERMInterpreter::VOptionList evalEach( VERMInterpreter::VermTreeIterator list, VERMInterpreter::Environment * env = nullptr );
 
 public:
-	using ContextBase::logger;
-
-	VERMInterpreter::ServerCb * acb;
-	VERMInterpreter::ServerBattleCb * bacb;
-	const IGameInfoCallback * icb;
-	const CBattleInfoCallback * bicb;
+	vstd::CLoggerBase * logger;
 
 	typedef std::map< int, std::vector<int> > TIDPattern;
 	void executeInstructions(); //called when starting a new game, before most of the map settings are done
-	void executeTriggerType(VERMInterpreter::TriggerType tt, bool pre, const TIDPattern & identifier, const std::vector<int> &funParams=std::vector<int>()); //use this to run triggers
-	void executeTriggerType(const char *trigger, int id); //convenience version of above, for pre-trigger when there is only one argument
-	void executeTriggerType(const char *trigger); //convenience version of above, for pre-trigger when there are no args
-	void setCurrentlyVisitedObj(int3 pos); //sets v998 - v1000 to given value
 
 	void scanScripts(); //scans for functions, triggers etc.
 
@@ -862,36 +771,5 @@ public:
 
 	std::string convert();
 
-	JsonNode callGlobal(const std::string & name, const JsonNode & parameters) override;
-	JsonNode callGlobal(VERMInterpreter::ServerCb * cb, const std::string & name, const JsonNode & parameters) override;
-	JsonNode callGlobal(VERMInterpreter::ServerBattleCb * cb, const std::string & name, const JsonNode & parameters) override;
-
-	void setGlobal(const std::string & name, int value) override;
-	void setGlobal(const std::string & name, const std::string & value) override;
-	void setGlobal(const std::string & name, double value) override;
-
-	void init(const IGameInfoCallback * cb, const CBattleInfoCallback * battleCb);//sets up environment etc.
-//	virtual void executeUserCommand(const std::string &cmd) override;
-
-	virtual void heroVisit(const CGHeroInstance *visitor, const CGObjectInstance *visitedObj, bool start) override;
-
-	virtual void battleStart(const CCreatureSet *army1, const CCreatureSet *army2, int3 tile, const CGHeroInstance *hero1, const CGHeroInstance *hero2, bool side) override;
-
-	const CGObjectInstance *getObjFrom(int3 pos);
-	template <typename T>
-	const T *getObjFromAs(int3 pos)
-	{
-		const T* obj =  dynamic_cast<const T*>(getObjFrom(pos));
-		if(obj)
-			return obj;
-		else
-			throw VERMInterpreter::EScriptExecError("Wrong cast attempted, object is not of a desired type!");
-	}
-
-    void checkActionCallback() const;
-
-    //action helpers
-
-	void showInfoDialog(const std::string & msg, PlayerColor player);
 
 };

@@ -69,8 +69,13 @@ private:
 	//require global function
 	static int require(lua_State * L);
 
+	//print global function
+	static int print(lua_State * L);
+
 	//require function implementation
 	int loadModule();
+
+	int printImpl();
 
 };
 

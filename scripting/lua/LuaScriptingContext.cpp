@@ -63,6 +63,16 @@ void LuaContext::cleanupGlobals()
 
 	lua_pushnil(L);
 	lua_setglobal(L, "loadstring");
+
+	lua_pushnil(L);
+	lua_setglobal(L, "print");
+
+	//TODO:
+	//string.dump
+
+	//math.random
+
+	//math.randomseed
 }
 
 void LuaContext::init(const IGameInfoCallback * cb, const CBattleInfoCallback * battleCb)
@@ -407,6 +417,15 @@ int LuaContext::loadModule()
 	return lua_gettop(L);
 }
 
+int LuaContext::print(lua_State * L)
+{
+	//TODO:
+}
+
+int LuaContext::printImpl()
+{
+	//TODO:
+}
 
 
 }

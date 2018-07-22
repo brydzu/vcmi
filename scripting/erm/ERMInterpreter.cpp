@@ -678,6 +678,437 @@ namespace ERMConverter
 		}
 	};
 
+	struct TLiteralEval : public boost::static_visitor<std::string>
+	{
+
+		std::string operator()(char const & val)
+		{
+			return boost::to_string(val);
+		}
+		std::string operator()(double const & val)
+		{
+			return boost::lexical_cast<std::string>(val);
+		}
+		std::string operator()(int const & val)
+		{
+			return boost::lexical_cast<std::string>(val);
+		}
+		std::string operator()(std::string const & val)
+		{
+			return "[===[" + std::string(val) + "]===]";
+		}
+	};
+
+	struct VOptionEval : public Converter
+	{
+		bool discardResult;
+
+		VOptionEval(std::ostream * out_, bool discardResult_ = false)
+			: Converter(out_),
+			discardResult(discardResult_)
+		{}
+
+		void operator()(VNIL const & opt) const
+		{
+			if(!discardResult)
+			{
+				(*out) << "return ";
+			}
+			(*out) << "nil";
+		}
+		void operator()(VNode const & opt) const;
+
+		void operator()(VSymbol const & opt) const
+		{
+			if(!discardResult)
+			{
+				(*out) << "return ";
+			}
+			(*out) << opt.text;
+		}
+		void operator()(TLiteral const & opt) const
+		{
+			if(!discardResult)
+			{
+				(*out) << "return ";
+			}
+
+			TLiteralEval tmp;
+
+			(*out) << boost::apply_visitor(tmp, opt);
+		}
+		void operator()(ERM::Tcommand const & opt) const
+		{
+			//this is how FP works, evaluation == producing side effects
+			//TODO: can we evaluate to smth more useful?
+			boost::apply_visitor(ERMExp(out), opt.cmd);
+		}
+		void operator()(VFunc const & opt) const
+		{
+//			return opt;
+		}
+	};
+
+	struct VOptionNodeEval : public Converter
+	{
+		bool discardResult;
+
+		VNode & exp;
+
+		VOptionNodeEval(std::ostream * out_, VNode & exp_, bool discardResult_ = false)
+			: Converter(out_),
+			discardResult(discardResult_),
+			exp(exp_)
+		{}
+
+		void operator()(VNIL const & opt) const
+		{
+			throw EVermScriptExecError("Nil does not evaluate to a function");
+		}
+
+		void operator()(VNode const & opt) const
+		{
+			VNode tmpn(exp);
+
+			(*out) << "local fu = ";
+
+			VOptionEval tmp(out, true);
+			tmp(opt);
+
+			(*out) << std::endl;
+
+			if(!discardResult)
+				(*out) << "return ";
+
+			(*out) << "fu(";
+
+			VOptionList args = tmpn.children.cdr().getAsList();
+
+			for(int g=0; g<args.size(); ++g)
+			{
+				if(g == 0)
+				{
+					boost::apply_visitor(VOptionEval(out, true), args[g]);
+				}
+				else
+				{
+					(*out) << ", ";
+					boost::apply_visitor(VOptionEval(out, true), args[g]);
+				}
+			}
+
+			(*out) << ")";
+		}
+
+		void operator()(VSymbol const & opt) const
+		{
+			std::map<std::string, std::string> symToOperator =
+			{
+				{"<", "<"},
+				{"<=", "<="},
+				{">", ">"},
+				{">=", ">="},
+				{"=", "=="},
+				{"+", "+"},
+				{"-", "-"},
+				{"*", "*"},
+				{"/", "/"},
+				{"%", "%"}
+			};
+
+			if(false)
+			{
+
+			}
+//			//check keywords
+//			else if(opt.text == "quote")
+//			{
+//				if(exp.children.size() == 2)
+//					return exp.children[1];
+//				else
+//					throw EVermScriptExecError("quote special form takes only one argument");
+//			}
+//			else if(opt.text == "backquote")
+//			{
+//				if(exp.children.size() == 2)
+//					return boost::apply_visitor(_SbackquoteEval(interp), exp.children[1]);
+//				else
+//					throw EVermScriptExecError("backquote special form takes only one argument");
+//
+//			}
+//			else if(opt.text == "car")
+//			{
+//				if(exp.children.size() != 2)
+//					throw EVermScriptExecError("car special form takes only one argument");
+//
+//				auto & arg = exp.children[1];
+//				VOption evaluated = interp->eval(arg);
+//
+//				return boost::apply_visitor(CarEval(interp), evaluated);
+//			}
+//			else if(opt.text == "cdr")
+//			{
+//				if(exp.children.size() != 2)
+//					throw EVermScriptExecError("cdr special form takes only one argument");
+//
+//				auto & arg = exp.children[1];
+//				VOption evaluated = interp->eval(arg);
+//
+//				return boost::apply_visitor(CdrEval(interp), evaluated);
+//			}
+			else if(opt.text == "if")
+			{
+				if(exp.children.size() > 4 || exp.children.size() < 3)
+					throw EVermScriptExecError("if special form takes two or three arguments");
+
+				(*out) << "if ";
+
+				boost::apply_visitor(VOptionEval(out, true),  exp.children[1]);
+
+				(*out) << " then" << std::endl;
+
+				boost::apply_visitor(VOptionEval(out, discardResult),  exp.children[2]);
+
+				if(exp.children.size() == 4)
+				{
+					(*out) << std::endl << "else" << std::endl;
+
+					boost::apply_visitor(VOptionEval(out, discardResult),  exp.children[3]);
+				}
+
+				(*out)<< std::endl << "end" << std::endl;
+			}
+			else if(opt.text == "lambda")
+			{
+				if(exp.children.size() <= 2)
+				{
+					throw EVermScriptExecError("Too few arguments for lambda special form");
+				}
+
+				(*out) << " function(";
+
+				VNode arglist = getAs<VNode>(exp.children[1]);
+
+				for(int g=0; g<arglist.children.size(); ++g)
+				{
+					std::string argName = getAs<VSymbol>(arglist.children[g]).text;
+
+					if(g == 0)
+						(*out) << argName;
+					else
+						(*out) << ", " <<argName;
+				}
+
+				(*out) << ")" << std::endl;
+
+				VOptionList body = exp.children.cdr().getAsCDR().getAsList();
+
+				for(int g=0; g<body.size(); ++g)
+				{
+					if(g < body.size()-1)
+						boost::apply_visitor(VOptionEval(out, true), body[g]);
+					else
+						boost::apply_visitor(VOptionEval(out, false), body[g]);
+				}
+
+				(*out)<< std::endl << "end";
+			}
+			else if(opt.text == "setq")
+			{
+				if(exp.children.size() != 3 && exp.children.size() != 4)
+					throw EVermScriptExecError("setq special form takes 2 or 3 arguments");
+
+				std::string name = getAs<VSymbol>(exp.children[1]).text;
+
+				size_t valIndex = 2;
+
+				if(exp.children.size() == 4)
+				{
+					TLiteral varIndexLit = getAs<TLiteral>(exp.children[2]);
+
+					int varIndex = getAs<int>(varIndexLit);
+
+					boost::format fmt("%s[%d]");
+					fmt % name % varIndex;
+
+					name = fmt.str();
+
+					valIndex = 3;
+				}
+
+				(*out) << name << " = ";
+
+				boost::apply_visitor(VOptionEval(out, true), exp.children[valIndex]);
+
+				(*out) << std::endl;
+
+				if(!discardResult)
+					(*out) << "return " << name << std::endl;
+			}
+			else if(opt.text == ERMInterpreter::defunSymbol)
+			{
+				if(exp.children.size() < 4)
+				{
+					throw EVermScriptExecError("defun special form takes at least 3 arguments");
+				}
+
+				std::string name = getAs<VSymbol>(exp.children[1]).text;
+
+				(*out) << std::endl << "local function " << name << " (";
+
+				VNode arglist = getAs<VNode>(exp.children[2]);
+
+				for(int g=0; g<arglist.children.size(); ++g)
+				{
+					std::string argName = getAs<VSymbol>(arglist.children[g]).text;
+
+					if(g == 0)
+						(*out) << argName;
+					else
+						(*out) << ", " <<argName;
+				}
+
+				(*out) << ")" << std::endl;
+
+				VOptionList body = exp.children.cdr().getAsCDR().getAsCDR().getAsList();
+
+				for(int g=0; g<body.size(); ++g)
+				{
+					if(g < body.size()-1)
+						boost::apply_visitor(VOptionEval(out, true), body[g]);
+					else
+						boost::apply_visitor(VOptionEval(out, false), body[g]);
+				}
+
+				(*out)<< std::endl << "end";
+
+				if(!discardResult)
+				{
+					(*out)  << std::endl << "return " << name;
+				}
+
+			}
+			else if(opt.text == "defmacro")
+			{
+//				if(exp.children.size() < 4)
+//				{
+//					throw EVermScriptExecError("defmacro special form takes at least 3 arguments");
+//				}
+//				VFunc f(exp.children.cdr().getAsCDR().getAsCDR().getAsList(), true);
+//				VNode arglist = getAs<VNode>(exp.children[2]);
+//				for(int g=0; g<arglist.children.size(); ++g)
+//				{
+//					f.args.push_back(getAs<VSymbol>(arglist.children[g]));
+//				}
+//				env.localBind(getAs<VSymbol>(exp.children[1]).text, f);
+//				return f;
+			}
+			else if(opt.text == "progn")
+			{
+				(*out)<< std::endl << "do" << std::endl;
+
+				for(int g=1; g<exp.children.size(); ++g)
+				{
+					if(g < exp.children.size()-1)
+						boost::apply_visitor(VOptionEval(out, true),  exp.children[g]);
+					else
+						boost::apply_visitor(VOptionEval(out, discardResult),  exp.children[g]);
+				}
+				(*out) << std::endl << "end" << std::endl;
+			}
+			else if(opt.text == "do") //evaluates second argument as long first evaluates to non-nil
+			{
+				if(exp.children.size() != 3)
+				{
+					throw EVermScriptExecError("do special form takes exactly 2 arguments");
+				}
+
+				(*out) << std::endl << "while ";
+
+				boost::apply_visitor(VOptionEval(out, true), exp.children[1]);
+
+				(*out) << " do" << std::endl;
+
+				boost::apply_visitor(VOptionEval(out, true), exp.children[2]);
+
+				(*out) << std::endl << "end" << std::endl;
+
+			}
+			//"apply" part of eval, a bit blurred in this implementation but this way it looks good too
+			else if(symToOperator.find(opt.text) != symToOperator.end())
+			{
+				if(!discardResult)
+					(*out) << "return ";
+
+				std::string _operator = symToOperator[opt.text];
+
+				VOptionList opts = exp.children.cdr().getAsList();
+
+				for(int g=0; g<opts.size(); ++g)
+				{
+					if(g == 0)
+					{
+						boost::apply_visitor(VOptionEval(out, true), opts[g]);
+					}
+					else
+					{
+						(*out) << " " << _operator << " ";
+						boost::apply_visitor(VOptionEval(out, true), opts[g]);
+					}
+				}
+			}
+			else
+			{
+				//assume callable
+				if(!discardResult)
+					(*out) << "return ";
+
+				(*out) << opt.text << "(";
+
+				VOptionList opts = exp.children.cdr().getAsList();
+
+				for(int g=0; g<opts.size(); ++g)
+				{
+					if(g == 0)
+					{
+						boost::apply_visitor(VOptionEval(out, true), opts[g]);
+					}
+					else
+					{
+						(*out) << ", ";
+						boost::apply_visitor(VOptionEval(out, true), opts[g]);
+					}
+				}
+
+				(*out) << ")";
+			}
+
+		}
+		void operator()(TLiteral const & opt) const
+		{
+			throw EVermScriptExecError("Literal does not evaluate to a function: "+boost::to_string(opt));
+		}
+		void operator()(ERM::Tcommand const & opt) const
+		{
+			throw EVermScriptExecError("ERM command does not evaluate to a function");
+		}
+		void operator()(VFunc const & opt) const
+		{
+//			return opt;
+		}
+	};
+
+	void VOptionEval::operator()(VNode const& opt) const
+	{
+		if(!opt.children.empty())
+		{
+			VOption & car = const_cast<VNode&>(opt).children.car().getAsItem();
+
+			boost::apply_visitor(VOptionNodeEval(out, const_cast<VNode&>(opt), discardResult), car);
+		}
+	}
+
+
 	struct Line : public Converter
 	{
 		Line(std::ostream * out_)
@@ -687,8 +1118,12 @@ namespace ERMConverter
 		void operator()(TVExp const & cmd) const
 		{
 			//TODO:
-//			VNode line(cmd);
-//			interp->eval(line);
+			VNode line(cmd);
+
+			VOptionEval eval(out, true);
+			eval(line);
+
+			(*out) << std::endl;
 		}
 		void operator()(TERMline const & cmd) const
 		{
@@ -801,7 +1236,7 @@ void ERMInterpreter::scanScripts()
 }
 
 ERMInterpreter::ERMInterpreter(vstd::CLoggerBase * logger_)
-	: ContextBase(logger_)
+	: logger(logger_)
 {
 	curFunc = nullptr;
 	curTrigger = nullptr;
@@ -810,10 +1245,6 @@ ERMInterpreter::ERMInterpreter(vstd::CLoggerBase * logger_)
 	globalEnv = new Environment();
 
 	topDyn = globalEnv;
-
-	acb = nullptr;
-	icb = nullptr;
-	bicb = nullptr;
 }
 
 ERMInterpreter::~ERMInterpreter()
@@ -975,881 +1406,14 @@ struct StandardBodyOptionItemVisitor : boost::static_visitor<>
 	}
 };
 
-template<typename T>
-struct StandardReceiverVisitor : boost::static_visitor<>
-{
-	ERMInterpreter * interp;
-	T identifier;
-	StandardReceiverVisitor(ERMInterpreter * _interpr, T ident) : interp(_interpr), identifier(ident)
-	{}
-
-	virtual void operator()(TVRLogic const& trig) const
-	{
-		throw EScriptExecError("VR logic not allowed in this receiver!");
-	}
-	virtual void operator()(TVRArithmetic const& trig) const
-	{
-		throw EScriptExecError("VR arithmetic not allowed in this receiver!");
-	}
-	virtual void operator()(TNormalBodyOption const& trig) const = 0;
-
-	template<typename OptionPerformer>
-	void performOptionTakingOneParamter(const ERM::TNormalBodyOptionList & params) const
-	{
-		if(params.size() == 1)
-		{
-			ERM::TBodyOptionItem boi = params[0];
-			boost::apply_visitor(
-				OptionPerformer(*const_cast<typename OptionPerformer::TReceiverType*>(static_cast<const typename OptionPerformer::TReceiverType*>(this))), boi);
-		}
-		else
-			throw EScriptExecError("This receiver option takes exactly 1 parameter!");
-	}
-
-	template<template <int opcode> class OptionPerformer>
-	void performOptionTakingOneParamterWithIntDispatcher(const ERM::TNormalBodyOptionList & params) const
-	{
-		if(params.size() == 2)
-		{
-			int optNum = interp->getIexp(params[0]).getInt();
-
-			ERM::TBodyOptionItem boi = params[1];
-			switch(optNum)
-			{
-			case 0:
-				boost::apply_visitor(
-					OptionPerformer<0>(*const_cast<typename OptionPerformer<0>::TReceiverType*>(static_cast<const typename OptionPerformer<0>::TReceiverType*>(this))), boi);
-				break;
-			default:
-				throw EScriptExecError("Wrong number of option code!");
-				break;
-			}
-		}
-		else
-			throw EScriptExecError("This receiver option takes exactly 2 parameters!");
-	}
-};
-////HE
-struct HEPerformer;
-
-template<int opcode>
-struct HE_BPerformer : StandardBodyOptionItemVisitor<HEPerformer>
-{
-	explicit HE_BPerformer(HEPerformer & _owner) : StandardBodyOptionItemVisitor<HEPerformer>(_owner)
-	{}
-	using StandardBodyOptionItemVisitor<HEPerformer>::operator();
-
-	void operator()(TIexp const& cmp) const override;
-	void operator()(TVarpExp const& cmp) const override;
-};
-
-template<int opcode>
-void HE_BPerformer<opcode>::operator()( TIexp const& cmp ) const
-{
-	throw EScriptExecError("Setting hero name is not implemented!");
-}
-
-template<int opcode>
-struct HE_CPerformer : StandardBodyOptionItemVisitor<HEPerformer>
-{
-	explicit HE_CPerformer(HEPerformer & _owner) : StandardBodyOptionItemVisitor<HEPerformer>(_owner)
-	{}
-	using StandardBodyOptionItemVisitor<HEPerformer>::operator();
-
-	void operator()(TIexp const& cmp) const override;
-	void operator()(TVarpExp const& cmp) const override;
-};
-
-template<int opcode>
-void HE_CPerformer<opcode>::operator()( TIexp const& cmp ) const
-{
-	throw EScriptExecError("Setting hero army is not implemented!");
-}
-
-struct HEPerformer : StandardReceiverVisitor<const CGHeroInstance *>
-{
-	HEPerformer(ERMInterpreter * _interpr, const CGHeroInstance * hero) : StandardReceiverVisitor<const CGHeroInstance *>(_interpr, hero)
-	{}
-	using StandardReceiverVisitor<const CGHeroInstance *>::operator();
-
-	void operator()(TNormalBodyOption const& trig) const override
-	{
-		switch(trig.optionCode)
-		{
-		case 'B':
-			{
-				performOptionTakingOneParamterWithIntDispatcher<HE_BPerformer>(trig.params);
-			}
-			break;
-		case 'C':
-			{
-				const ERM::TNormalBodyOptionList & params = trig.params;
-				if(params.size() == 4)
-				{
-					if(interp->getIexp(params[0]).getInt() == 0)
-					{
-						SlotID slot = SlotID(interp->getIexp(params[1]).getInt());
-						const CStackInstance *stack = identifier->getStackPtr(slot);
-						if(params[2].which() == 6) //varp
-						{
-							IexpValStr lhs = interp->getIexp(boost::get<ERM::TVarpExp>(params[2]));
-							if(stack)
-								lhs.setTo(stack->getCreatureID());
-							else
-								lhs.setTo(-1);
-						}
-						else
-							throw EScriptExecError("Setting stack creature type is not implemented!");
-
-						if(params[3].which() == 6) //varp
-						{
-							interp->getIexp(boost::get<ERM::TVarpExp>(params[3])).setTo(identifier->getStackCount(SlotID(slot)));
-						}
-						else
-							throw EScriptExecError("Setting stack count is not implemented!");
-					}
-					else
-						throw EScriptExecError("Slot number must be an evaluable i-exp");
-				}
-				//todo else if(14 params)
-				else
-					throw EScriptExecError("Slot number must be an evaluable i-exp");
-			}
-			break;
-		case 'E':
-			break;
-		case 'N':
-			break;
-		default:
-			break;
-		}
-	}
-
-};
-struct IFPerformer;
-
-struct IF_MPerformer : StandardBodyOptionItemVisitor<IFPerformer>
-{
-	explicit IF_MPerformer(IFPerformer & _owner) : StandardBodyOptionItemVisitor<IFPerformer>(_owner){}
-	using StandardBodyOptionItemVisitor<IFPerformer>::operator();
-
-	void operator()(TStringConstant const& cmp) const override;
-};
-
-
-//according to the ERM help:
-//"%%" -> "%"
-//"%V#" -> current value of # flag.
-//"%Vf"..."%Vt" -> current value of corresponding variable.
-//"%W1"..."%W100" -> current value of corresponding hero variable.
-//"%X1"..."%X16" -> current value of corresponding function parameter.
-//"%Y1"..."%Y100" -> current value of corresponding local variable.
-//"%Z1"..."%Z500" -> current value of corresponding string variable.
-//"%$macro$" -> macro name of corresponding variable
-//"%Dd" -> current day of week
-//"%Dw" -> current week
-//"%Dm" -> current month
-//"%Da" -> current day from beginning of the game
-//"%Gc" -> the color of current gamer in text
-struct StringFormatter
-{
-	ERMInterpreter * interpr;
-	int pos;
-	int tokenLength;
-	size_t percentPos;
-	int charsToReplace;
-	std::string &msg;
-
-	StringFormatter(ERMInterpreter * _interpr, std::string &MSG)
-		: interpr(_interpr), pos(0), msg(MSG)
-	{}
-
-	static void format(ERMInterpreter * _interpr, std::string &msg)
-	{
-		StringFormatter sf(_interpr, msg);
-		sf.format();
-	}
-
-	// startpos is the first digit
-	// digits will be converted to number and returned
-	// ADDITIVE on digitsUsed
-	int getNum()
-	{
-		int toAdd = 0;
-		int numStart = percentPos + 2;
-		size_t numEnd = msg.find_first_not_of("1234567890", numStart);
-
-		if(numEnd == std::string::npos)
-			toAdd = msg.size() - numStart;
-		else
-			toAdd = numEnd - numStart;
-
-		charsToReplace += toAdd;
-		return boost::lexical_cast<int>(msg.substr(numStart, toAdd));
-	}
-
-	void format()
-	{
-		while(pos < msg.size())
-		{
-			percentPos = msg.find_first_of('%', pos);
-			charsToReplace = 1; //at least the same '%' needs to be replaced
-
-			std::ostringstream replaceWithWhat;
-
-			if(percentPos == std::string::npos) //processing done?
-				break;
-
-			if(percentPos + 1 >= msg.size()) //at least one character after % is required
-				throw EScriptExecError("Formatting error: % at the end of string!");
-
-			charsToReplace++; //the sign after % is consumed
-			switch(msg[percentPos+1])
-			{
-			case '%':
-				replaceWithWhat << '%';
-				break;
-			case 'F':
-				replaceWithWhat << interpr->ermGlobalEnv->getFlag(getNum());
-				break;
-			case 'V':
-				if(std::isdigit(msg[percentPos + 2]))
-					replaceWithWhat << interpr->ermGlobalEnv->getStandardVar(getNum());
-				else
-				{
-					charsToReplace++;
-					replaceWithWhat << interpr->ermGlobalEnv->getQuickVar(msg[percentPos+2]);
-				}
-				break;
-			case 'X':
-				replaceWithWhat << interpr->getVar("x", getNum()).getInt();
-				break;
-			case 'Z':
-				replaceWithWhat << interpr->ermGlobalEnv->getZVar(getNum());
-				break;
-			default:
-				throw EScriptExecError("Formatting error: unrecognized token indicator after %!");
-			}
-			msg.replace(percentPos, charsToReplace, replaceWithWhat.str());
-			pos = percentPos + 1;
-		}
-	}
-};
-
-struct IFPerformer : StandardReceiverVisitor<TUnusedType>
-{
-	IFPerformer(ERMInterpreter * _interpr) : StandardReceiverVisitor<TUnusedType>(_interpr, 0)
-	{}
-	using StandardReceiverVisitor<TUnusedType>::operator();
-
-
-	void operator()(TNormalBodyOption const& trig) const override
-	{
-		switch(trig.optionCode)
-		{
-		case 'M': //Show the message (Text) or contents of z$ variable on the screen immediately.
-			performOptionTakingOneParamter<IF_MPerformer>(trig.params);
-			break;
-		default:
-			break;
-		}
-	}
-
-	void showMessage(const std::string &msg)
-	{
-		std::string msgToFormat = msg;
-		StringFormatter::format(interp, msgToFormat);
-		interp->showInfoDialog(msgToFormat, interp->icb->getLocalPlayer());
-	}
-};
-
-void IF_MPerformer::operator()(TStringConstant const& cmp) const
-{
-	owner.showMessage(cmp.str);
-}
-
-template<int opcode>
-void HE_BPerformer<opcode>::operator()( TVarpExp const& cmp ) const
-{
-	owner.interp->getIexp(cmp).setTo(owner.identifier->name);
-}
-
-template<int opcode>
-void HE_CPerformer<opcode>::operator()( TVarpExp const& cmp ) const
-{
-	owner.interp->getIexp(cmp).setTo(owner.identifier->name);
-}
-
-////MA
-struct MAPerformer;
-struct MA_PPerformer : StandardBodyOptionItemVisitor<MAPerformer>
-{
-	explicit MA_PPerformer(MAPerformer & _owner);
-	using StandardBodyOptionItemVisitor<MAPerformer>::operator();
-
-	void operator()(TIexp const& cmp) const override;
-	void operator()(TVarpExp const& cmp) const override;
-};
-
-struct MAPerformer : StandardReceiverVisitor<TUnusedType>
-{
-	MAPerformer(ERMInterpreter * _interpr) : StandardReceiverVisitor<TUnusedType>(_interpr, 0)
-	{}
-	using StandardReceiverVisitor<TUnusedType>::operator();
-
-	void operator()(TNormalBodyOption const& trig) const override
-	{
-		switch(trig.optionCode)
-		{
-		case 'A': //sgc monster attack
-			break;
-		case 'B': //spell?
-			break;
-		case 'P': //hit points
-			{
-				//TODO
-			}
-			break;
-		default:
-			break;
-		}
-	}
-
-};
-
-void MA_PPerformer::operator()( TIexp const& cmp ) const
-{
-
-}
-
-void MA_PPerformer::operator()( TVarpExp const& cmp ) const
-{
-
-}
-
-////MO
-
-struct MOPerformer;
-struct MO_GPerformer : StandardBodyOptionItemVisitor<MOPerformer>
-{
-	explicit MO_GPerformer(MOPerformer & _owner) : StandardBodyOptionItemVisitor<MOPerformer>(_owner)
-	{}
-	using StandardBodyOptionItemVisitor<MOPerformer>::operator();
-
-	void operator()(TVarpExp const& cmp) const override;
-	void operator()(TIexp const& cmp) const override;
-};
-
-struct MOPerformer: StandardReceiverVisitor<int3>
-{
-	MOPerformer(ERMInterpreter * _interpr, int3 pos) : StandardReceiverVisitor<int3>(_interpr, pos)
-	{}
-	using StandardReceiverVisitor<int3>::operator();
-
-	void operator()(TNormalBodyOption const& trig) const override
-	{
-		switch(trig.optionCode)
-		{
-		case 'G':
-			{
-				performOptionTakingOneParamter<MO_GPerformer>(trig.params);
-			}
-			break;
-		default:
-			break;
-		}
-	}
-};
-
-void MO_GPerformer::operator()( TIexp const& cmp ) const
-{
-	throw EScriptExecError("Setting monster count is not implemented yet!");
-}
-
-void MO_GPerformer::operator()( TVarpExp const& cmp ) const
-{
-	const CGCreature *cre = owner.interp->getObjFromAs<CGCreature>(owner.identifier);
-	owner.interp->getIexp(cmp).setTo(cre->getStackCount(SlotID(0)));
-}
-
-
-struct ConditionDisemboweler;
-//OB
-struct OBPerformer;
-struct OB_UPerformer : StandardBodyOptionItemVisitor<OBPerformer>
-{
-	explicit OB_UPerformer(OBPerformer & owner) : StandardBodyOptionItemVisitor<OBPerformer>(owner)
-	{}
-	using StandardBodyOptionItemVisitor<OBPerformer>::operator();
-
-	virtual void operator()(TIexp const& cmp) const;
-	virtual void operator()(TVarpExp const& cmp) const;
-};
-
-struct OBPerformer : StandardReceiverVisitor<int3>
-{
-	OBPerformer(ERMInterpreter * _interpr, int3 objPos) : StandardReceiverVisitor<int3>(_interpr, objPos)
-	{}
-	using StandardReceiverVisitor<int3>::operator(); //it removes compilation error... not sure why it *must* be here
-	void operator()(TNormalBodyOption const& trig) const
-	{
-		switch(trig.optionCode)
-		{
-		case 'B': //removes description hint
-			{
-				//TODO
-			}
-			break;
-		case 'C': //sgc of control word of object
-			{
-				//TODO
-			}
-			break;
-		case 'D': //disable gamer to use object
-			{
-				//TODO
-			}
-			break;
-		case 'E': //enable gamer to use object
-			{
-				//TODO
-			}
-			break;
-		case 'H': //replace hint for object
-			{
-				//TODO
-			}
-			break;
-		case 'M': //disabling messages and questions
-			{
-				//TODO
-			}
-			break;
-		case 'R': //enable all gamers to use object
-			{
-				//TODO
-			}
-			break;
-		case 'S': //disable all gamers to use object
-			{
-				//TODO
-			}
-			break;
-		case 'T': //sgc of obj type
-			{
-				//TODO
-			}
-			break;
-		case 'U': //sgc of obj subtype
-			{
-				performOptionTakingOneParamter<OB_UPerformer>(trig.params);
-			}
-			break;
-		default:
-			throw EScriptExecError("Wrong OB receiver option!");
-			break;
-		}
-	}
-};
-
-void OB_UPerformer::operator()( TIexp const& cmp ) const
-{
-	IexpValStr val = owner.interp->getIexp(cmp);
-	throw EScriptExecError("Setting subID is not implemented yet!");
-}
-
-void OB_UPerformer::operator()( TVarpExp const& cmp ) const
-{
-	IexpValStr val = owner.interp->getIexp(cmp);
-	val.setTo(owner.interp->getObjFrom(owner.identifier)->subID);
-}
-
-/////VR
-struct VRPerformer;
-struct VR_SPerformer : StandardBodyOptionItemVisitor<VRPerformer>
-{
-	explicit VR_SPerformer(VRPerformer & _owner);
-	using StandardBodyOptionItemVisitor<VRPerformer>::operator();
-
-	void operator()(TStringConstant const& cmp) const override;
-	void operator()(TIexp const& cmp) const override;
-};
-
-struct VRPerformer : StandardReceiverVisitor<IexpValStr>
-{
-	VRPerformer(ERMInterpreter * _interpr, IexpValStr ident) : StandardReceiverVisitor<IexpValStr>(_interpr, ident)
-	{}
-
-	void operator()(TVRLogic const& trig) const override
-	{
-		int valr = interp->getIexp(trig.var).getInt();
-		switch (trig.opcode)
-		{
-		case '&':
-			const_cast<VRPerformer*>(this)->identifier.setTo(identifier.getInt() & valr);
-			break;
-		case '|':
-			const_cast<VRPerformer*>(this)->identifier.setTo(identifier.getInt() | valr);
-			break;
-		case 'X':
-			const_cast<VRPerformer*>(this)->identifier.setTo(identifier.getInt() ^ valr);
-			break;
-		default:
-			throw EInterpreterError("Wrong opcode in VR logic expression!");
-			break;
-		}
-	}
-	void operator()(TVRArithmetic const& trig) const override
-	{
-		IexpValStr rhs = interp->getIexp(trig.rhs);
-		switch (trig.opcode)
-		{
-		case '+':
-			const_cast<VRPerformer*>(this)->identifier += rhs;
-			break;
-		case '-':
-			const_cast<VRPerformer*>(this)->identifier -= rhs;
-			break;
-		case '*':
-			const_cast<VRPerformer*>(this)->identifier *= rhs;
-			break;
-		case ':':
-			const_cast<VRPerformer*>(this)->identifier /= rhs;
-			break;
-		case '%':
-			const_cast<VRPerformer*>(this)->identifier %= rhs;
-			break;
-		default:
-			throw EInterpreterError("Wrong opcode in VR arithmetic!");
-			break;
-		}
-	}
-	void operator()(TNormalBodyOption const& trig) const override
-	{
-		switch(trig.optionCode)
-		{
-		case 'C': //setting/checking v vars
-			{
-				//TODO
-			}
-			break;
-		case 'H': //checking if string is empty
-			{
-				//TODO
-			}
-			break;
-		case 'M': //string operations
-			{
-				//TODO
-			}
-			break;
-		case 'R': //random variables
-			{
-				//TODO
-			}
-			break;
-		case 'S': //setting variable
-			{
-				performOptionTakingOneParamter<VR_SPerformer>(trig.params);
-			}
-			break;
-		case 'T': //random variables
-			{
-				//TODO
-			}
-			break;
-		case 'U': //search for a substring
-			{
-				//TODO
-			}
-			break;
-		case 'V': //convert string to value
-			{
-				//TODO
-			}
-			break;
-		default:
-			throw EScriptExecError("Wrong VR receiver option!");
-			break;
-		}
-	}
-};
-
-
-VR_SPerformer::VR_SPerformer(VRPerformer & _owner) : StandardBodyOptionItemVisitor<VRPerformer>(_owner)
-{}
-
-void VR_SPerformer::operator()(ERM::TIexp const& trig) const
-{
-	owner.identifier.setTo(owner.interp->getIexp(trig));
-}
-void VR_SPerformer::operator()(TStringConstant const& cmp) const
-{
-	owner.identifier.setTo(cmp.str);
-}
-
-/////
-
-struct ERMExpDispatch : boost::static_visitor<>
-{
-	struct HLP
-	{
-		ERMInterpreter * interp;
-
-		HLP(ERMInterpreter * _interp)
-			: interp(_interp)
-		{}
-
-		int3 getPosFromIdentifier(ERM::Tidentifier tid, bool allowDummyFourth)
-		{
-			switch(tid.size())
-			{
-			case 1:
-				{
-					int num = interp->getIexp(tid[0]).getInt();
-					return int3(interp->ermGlobalEnv->getStandardVar(num),
-						interp->ermGlobalEnv->getStandardVar(num+1),
-						interp->ermGlobalEnv->getStandardVar(num+2));
-				}
-				break;
-			case 3:
-			case 4:
-				if(tid.size() == 4 && !allowDummyFourth)
-					throw EScriptExecError("4 items in identifier are not allowed for this receiver!");
-
-				return int3(interp->getIexp(tid[0]).getInt(),
-					interp->getIexp(tid[1]).getInt(),
-					interp->getIexp(tid[2]).getInt());
-				break;
-			default:
-				throw EScriptExecError("This receiver takes 1 or 3 items in identifier!");
-				break;
-			}
-		}
-		template <typename Visitor>
-		void performBody(const boost::optional<ERM::Tbody> & body, const Visitor& visitor)
-		{
-			if(body.is_initialized())
-			{
-				ERM::Tbody bo = body.get();
-				for(int g=0; g<bo.size(); ++g)
-				{
-					boost::apply_visitor(visitor, bo[g]);
-				}
-			}
-		}
-	};
-
-	ERMInterpreter * interp;
-
-	ERMExpDispatch(ERMInterpreter * interp_)
-		: interp(interp_)
-	{
-	}
-
-	void operator()(Ttrigger const& trig) const
-	{
-		throw EInterpreterError("Triggers cannot be executed!");
-	}
-	void operator()(Tinstruction const& trig) const
-	{
-	}
-	void operator()(Treceiver const& trig) const
-	{
-		HLP helper(interp);
-		//check condition
-		if(trig.condition.is_initialized())
-		{
-			if( !interp->checkCondition(trig.condition.get()) )
-				return;
-		}
-
-		if(trig.name == "VR")
-		{
-			//perform operations
-			if(trig.identifier.is_initialized())
-			{
-				ERM::Tidentifier ident = trig.identifier.get();
-				if(ident.size() == 1)
-				{
-					IexpValStr ievs = interp->getIexp(ident[0]);
-
-					//see body
-					helper.performBody(trig.body, VRPerformer(interp, ievs));
-				}
-				else
-					throw EScriptExecError("VR receiver must be used with exactly one identifier item!");
-			}
-			else
-				throw EScriptExecError("VR receiver must be used with an identifier!");
-		}
-		else if(trig.name == "DO")
-		{
-			//perform operations
-			if(trig.identifier.is_initialized())
-			{
-				ERM::Tidentifier tid = trig.identifier.get();
-				if(tid.size() != 4)
-				{
-					throw EScriptExecError("DO receiver takes exactly 4 arguments");
-				}
-				int funNum = interp->getIexp(tid[0]).getInt(),
-					startVal = interp->getIexp(tid[1]).getInt(),
-					stopVal = interp->getIexp(tid[2]).getInt(),
-					increment = interp->getIexp(tid[3]).getInt();
-
-				for(int it = startVal; it < stopVal; it += increment)
-				{
-					std::vector<int> params(FunctionLocalVars::NUM_PARAMETERS, 0);
-					params.back() = it;
-					//owner->getFuncVars(funNum)->getParam(16) = it;
-
-					std::vector<int> v1;
-					v1.push_back(funNum);
-					ERMInterpreter::TIDPattern tip = {{v1.size(), v1}};
-					interp->executeTriggerType(TriggerType("FU"), true, tip, params);
-					it = interp->getFuncVars(funNum)->getParam(16);
-				}
-			}
-		}
-		else if(trig.name == "MA")
-		{
-			if(trig.identifier.is_initialized())
-			{
-				throw EScriptExecError("MA receiver doesn't take the identifier!");
-			}
-			helper.performBody(trig.body, MAPerformer(interp));
-		}
-		else if(trig.name == "MO")
-		{
-			int3 objPos;
-			if(trig.identifier.is_initialized())
-			{
-				ERM::Tidentifier tid = trig.identifier.get();
-				objPos = HLP(interp).getPosFromIdentifier(tid, true);
-
-				helper.performBody(trig.body, MOPerformer(interp, objPos));
-			}
-			else
-				throw EScriptExecError("MO receiver must have an identifier!");
-		}
-		else if(trig.name == "OB")
-		{
-			int3 objPos;
-			if(trig.identifier.is_initialized())
-			{
-				ERM::Tidentifier tid = trig.identifier.get();
-				objPos = HLP(interp).getPosFromIdentifier(tid, false);
-
-				helper.performBody(trig.body, OBPerformer(interp, objPos));
-			}
-			else
-				throw EScriptExecError("OB receiver must have an identifier!");
-		}
-		else if(trig.name == "HE")
-		{
-			if(trig.identifier.is_initialized())
-			{
-				const CGHeroInstance * hero = nullptr;
-				ERM::Tidentifier tid = trig.identifier.get();
-				switch(tid.size())
-				{
-				case 1:
-					{
-						int heroNum = interp->getIexp(tid[0]).getInt();
-						if(heroNum < 0)
-							throw EScriptExecError("Indirect hero selection is not implemented!");
-						else
-							hero = interp->icb->getHeroWithSubid(heroNum);
-
-					}
-					break;
-				case 3:
-					{
-						int3 pos = helper.getPosFromIdentifier(tid, false);
-						hero = interp->getObjFromAs<CGHeroInstance>(pos);
-					}
-					break;
-				default:
-					throw EScriptExecError("HE receiver takes 1 or 3 items in identifier");
-					break;
-				}
-				helper.performBody(trig.body, HEPerformer(interp, hero));
-			}
-			else
-				throw EScriptExecError("HE receiver must have an identifier!");
-		}
-		else if(trig.name == "IF")
-		{
-			helper.performBody(trig.body, IFPerformer(interp));
-		}
-		else
-		{
-			interp->logger->warn("%s receiver is not supported yet, doing nothing...", trig.name);
-			//not supported or invalid trigger
-		}
-	}
-	void operator()(TPostTrigger const& trig) const
-	{
-		throw EInterpreterError("Post-triggers cannot be executed!");
-	}
-};
-
-struct CommandExec : boost::static_visitor<>
-{
-	ERMInterpreter * interp;
-
-	CommandExec(ERMInterpreter * interp_)
-		:interp(interp_)
-	{
-	}
-
-	void operator()(Tcommand const& cmd) const
-	{
-		boost::apply_visitor(ERMExpDispatch(interp), cmd.cmd);
-//		logGlobal->debug("Line comment: %s", cmd.comment);
-	}
-	void operator()(std::string const& comment) const
-	{
-		//comment - do nothing
-	}
-	void operator()(spirit::unused_type const& nothing) const
-	{
-		//nothing - do nothing
-	}
-};
-
-struct LineExec : boost::static_visitor<>
-{
-	ERMInterpreter * interp;
-
-	LineExec(ERMInterpreter * interp_)
-		:interp(interp_)
-	{
-	}
-
-	void operator()(TVExp const& cmd) const
-	{
-		VNode line(cmd);
-		interp->eval(line);
-	}
-	void operator()(TERMline const& cmd) const
-	{
-		boost::apply_visitor(CommandExec(interp), cmd);
-	}
-};
-
-/////////
-
 void ERMInterpreter::executeLine( const LinePointer & lp )
 {
-	logger->trace("Executing line %d (internal %d) from %s", getRealLine(lp), lp.lineNum, lp.file->filename);
 	executeLine(scripts[lp]);
 }
 
 void ERMInterpreter::executeLine(const ERM::TLine &line)
 {
-	boost::apply_visitor(LineExec(this), line);
+	assert(false);
 }
 
 IexpValStr ERMInterpreter::getVar(std::string toFollow, boost::optional<int> initVal) const
@@ -2041,163 +1605,6 @@ IexpValStr ERMInterpreter::getVar(std::string toFollow, boost::optional<int> ini
 	return ret;
 }
 
-namespace IexpDisemboweler
-{
-	enum EDir{GET, SET};
-}
-
-struct LVL2IexpDisemboweler : boost::static_visitor<IexpValStr>
-{
-	/*const*/ ERMInterpreter * env;
-	IexpDisemboweler::EDir dir;
-
-	LVL2IexpDisemboweler(/*const*/ ERMInterpreter * _env, IexpDisemboweler::EDir _dir)
-		: env(_env), dir(_dir) //writes value to given var
-	{}
-
-	IexpValStr processNotMacro(const TVarExpNotMacro & val) const
-	{
-		if(val.questionMark.is_initialized())
-			throw EIexpProblem("Question marks ('?') are not allowed in getter i-expressions");
-
-		//const-cast just to do some code-reuse...
-		return env->getVar(val.varsym, val.val);
-
-	}
-
-	IexpValStr operator()(TVarExpNotMacro const& val) const
-	{
-		return processNotMacro(val);
-	}
-	IexpValStr operator()(TMacroUsage const& val) const
-	{
-		return env->getIexp(val);
-	}
-};
-
-struct LVL1IexpDisemboweler : boost::static_visitor<IexpValStr>
-{
-	/*const*/ ERMInterpreter * env;
-	IexpDisemboweler::EDir dir;
-
-	LVL1IexpDisemboweler(/*const*/ ERMInterpreter * _env, IexpDisemboweler::EDir _dir)
-		: env(_env), dir(_dir) //writes value to given var
-	{}
-	IexpValStr operator()(int const & constant) const
-	{
-		if(dir == IexpDisemboweler::GET)
-		{
-			return IexpValStr(constant);
-		}
-		else
-		{
-			throw EIexpProblem("Cannot set a constant!");
-		}
-	}
-	IexpValStr operator()(TVarExp const & var) const
-	{
-		return boost::apply_visitor(LVL2IexpDisemboweler(env, dir), var);
-	}
-};
-
-IexpValStr ERMInterpreter::getIexp( const ERM::TIexp & iexp ) const
-{
-	return boost::apply_visitor(LVL1IexpDisemboweler(const_cast<ERMInterpreter*>(this), IexpDisemboweler::GET), iexp);
-}
-
-IexpValStr ERMInterpreter::getIexp( const ERM::TMacroUsage & macro ) const
-{
-	std::map<std::string, ERM::TVarExpNotMacro>::const_iterator it =
-		ermGlobalEnv->macroBindings.find(macro.macro);
-	if(it == ermGlobalEnv->macroBindings.end())
-		throw EUsageOfUndefinedMacro(macro.macro);
-
-	return getVar(it->second.varsym, it->second.val);
-}
-
-//IexpValStr ERMInterpreter::getIexp( const ERM::TIdentifierInternal & tid ) const
-//{
-//	if(tid.which() == 0)
-//	{
-//		return getIexp(boost::get<ERM::TIexp>(tid));
-//	}
-//	else
-//		throw EScriptExecError("Identifier must be a valid i-expression to perform this operation!");
-//}
-
-IexpValStr ERMInterpreter::getIexp( const ERM::TVarpExp & tid ) const
-{
-	return boost::apply_visitor(LVL2IexpDisemboweler(const_cast<ERMInterpreter*>(this), IexpDisemboweler::GET), tid.var);
-}
-
-struct LVL3BodyOptionItemVisitor : StandardBodyOptionItemVisitor<IexpValStr>
-{
-	const ERMInterpreter * env;
-
-	explicit LVL3BodyOptionItemVisitor(const ERMInterpreter * env_, IexpValStr & _owner)
-		: StandardBodyOptionItemVisitor<IexpValStr>(_owner),
-		env(env_)
-	{}
-	using StandardBodyOptionItemVisitor<IexpValStr>::operator();
-
-	void operator()(TIexp const& cmp) const override
-	{
-		owner = env->getIexp(cmp);
-	}
-	void operator()(TVarpExp const& cmp) const override
-	{
-		owner = env->getIexp(cmp);
-	}
-};
-
-IexpValStr ERMInterpreter::getIexp( const ERM::TBodyOptionItem & opit ) const
-{
-	IexpValStr ret;
-	boost::apply_visitor(LVL3BodyOptionItemVisitor(this, ret), opit);
-	return ret;
-}
-
-void ERMInterpreter::executeTriggerType(VERMInterpreter::TriggerType tt, bool pre, const TIDPattern & identifier, const std::vector<int> &funParams)
-{
-	struct HLP
-	{
-		static int calcFunNum(VERMInterpreter::TriggerType tt, const TIDPattern & identifier)
-		{
-			if(tt.type != VERMInterpreter::TriggerType::FU)
-				return -1;
-
-			return identifier.begin()->second[0];
-		}
-	};
-	TtriggerListType & triggerList = pre ? triggers : postTriggers;
-
-	TriggerIdentifierMatch tim;
-	tim.allowNoIdetifier = true;
-	tim.ermEnv = this;
-	tim.matchToIt = identifier;
-	std::vector<Trigger> & triggersToTry = triggerList[tt];
-	for(int g=0; g<triggersToTry.size(); ++g)
-	{
-		if(tim.tryMatch(&triggersToTry[g]))
-		{
-			curTrigger = &triggersToTry[g];
-			executeTrigger(triggersToTry[g], HLP::calcFunNum(tt, identifier), funParams);
-		}
-	}
-}
-
-void ERMInterpreter::executeTriggerType(const char *trigger, int id)
-{
-	TIDPattern tip;
-	tip[1] = std::vector<int>(1, id);
-	executeTriggerType(VERMInterpreter::TriggerType(trigger), true, tip);
-}
-
-void ERMInterpreter::executeTriggerType(const char *trigger)
-{
-	executeTriggerType(VERMInterpreter::TriggerType(trigger), true, TIDPattern());
-}
-
 ERM::TTriggerBase & ERMInterpreter::retrieveTrigger( ERM::TLine &line )
 {
 	if(line.which() == 1)
@@ -2221,118 +1628,9 @@ ERM::TTriggerBase & ERMInterpreter::retrieveTrigger( ERM::TLine &line )
 	throw ELineProblem("Given line is not an ERM trigger!");
 }
 
-template<typename T>
-bool compareExp(const T & lhs, const T & rhs, std::string op)
-{
-	if(op == "<")
-	{
-		return lhs < rhs;
-	}
-	else if(op == ">")
-	{
-		return lhs > rhs;
-	}
-	else if(op == ">=" || op == "=>")
-	{
-		return lhs >= rhs;
-	}
-	else if(op == "<=" || op == "=<")
-	{
-		return lhs <= rhs;
-	}
-	else if(op == "==")
-	{
-		return lhs == rhs;
-	}
-	else if(op == "<>" || op == "><")
-	{
-		return lhs != rhs;
-	}
-	else
-		throw EScriptExecError(std::string("Wrong comparison sign: ") + op);
-}
-
-struct ConditionDisemboweler : boost::static_visitor<bool>
-{
-	ConditionDisemboweler(ERMInterpreter * _ei) : ei(_ei)
-	{}
-
-	bool operator()(TComparison const & cmp) const
-	{
-		IexpValStr lhs = ei->getIexp(cmp.lhs),
-			rhs = ei->getIexp(cmp.rhs);
-		switch (lhs.type)
-		{
-		case IexpValStr::FLOATVAR:
-			switch (rhs.type)
-			{
-			case IexpValStr::FLOATVAR:
-				return compareExp(lhs.getFloat(), rhs.getFloat(), cmp.compSign);
-				break;
-			default:
-				throw EScriptExecError("Incompatible types for comparison");
-			}
-			break;
-		case IexpValStr::INT:
-		case IexpValStr::INTVAR:
-			switch (rhs.type)
-			{
-			case IexpValStr::INT:
-			case IexpValStr::INTVAR:
-				return compareExp(lhs.getInt(), rhs.getInt(), cmp.compSign);
-				break;
-			default:
-				throw EScriptExecError("Incompatible types for comparison");
-			}
-			break;
-		case IexpValStr::STRINGVAR:
-			switch (rhs.type)
-			{
-			case IexpValStr::STRINGVAR:
-				return compareExp(lhs.getString(), rhs.getString(), cmp.compSign);
-				break;
-			default:
-				throw EScriptExecError("Incompatible types for comparison");
-			}
-			break;
-		default:
-			throw EScriptExecError("Wrong type of left iexp!");
-		}
-		return false;//we should never reach this place
-	}
-	bool operator()(int const & flag) const
-	{
-		return ei->ermGlobalEnv->getFlag(flag);
-	}
-private:
-	ERMInterpreter * ei;
-};
-
 bool ERMInterpreter::checkCondition( ERM::Tcondition cond )
 {
-	//???????
-	bool ret = boost::apply_visitor(ConditionDisemboweler(this), cond.cond);
-	if(cond.rhs.is_initialized())
-	{ //taking care of rhs expression
-		bool rhs = checkCondition(cond.rhs.get().get());
-		switch (cond.ctype)
-		{
-		case '&':
-			ret &= rhs;
-			break;
-		case '|':
-			ret |= rhs;
-			break;
-		case 'X':
-			ret ^= rhs;
-			break;
-		default:
-			throw EInterpreterProblem(std::string("Strange - wrong condition connection (") + cond.ctype + ") !");
-			break;
-		}
-	}
-
-	return ret;
+	return false;
 }
 
 FunctionLocalVars * ERMInterpreter::getFuncVars( int funNum )
@@ -2356,92 +1654,9 @@ int ERMInterpreter::getRealLine(const LinePointer &lp)
 	return -1;
 }
 
-void ERMInterpreter::setCurrentlyVisitedObj( int3 pos )
-{
-	ermGlobalEnv->getStandardVar(998) = pos.x;
-	ermGlobalEnv->getStandardVar(999) = pos.y;
-	ermGlobalEnv->getStandardVar(1000) = pos.z;
-}
-
 const std::string ERMInterpreter::triggerSymbol = "trigger";
 const std::string ERMInterpreter::postTriggerSymbol = "postTrigger";
 const std::string ERMInterpreter::defunSymbol = "defun";
-
-
-struct TriggerIdMatchHelper : boost::static_visitor<>
-{
-	int & ret;
-	ERMInterpreter * interpreter;
-	Trigger * trig;
-
-	TriggerIdMatchHelper(int & b, ERMInterpreter * ermint, Trigger * _trig)
-	: ret(b), interpreter(ermint), trig(_trig)
-	{}
-
-	void operator()(TIexp const& iexp) const
-	{
-		IexpValStr val = interpreter->getIexp(iexp);
-		switch(val.type)
-		{
-		case IexpValStr::INT:
-		case IexpValStr::INTVAR:
-			ret = val.getInt();
-			break;
-		default:
-			throw EScriptExecError("Incompatible i-exp type!");
-			break;
-		}
-	}
-	void operator()(TArithmeticOp const& arop) const
-	{
-		//error?!?
-	}
-};
-
-bool TriggerIdentifierMatch::tryMatch( Trigger * interptrig ) const
-{
-	bool ret = true;
-
-	const ERM::TTriggerBase & trig = ERMInterpreter::retrieveTrigger(ermEnv->retrieveLine(interptrig->line));
-	if(trig.identifier.is_initialized())
-	{
-
-		ERM::Tidentifier tid = trig.identifier.get();
-		std::map< int, std::vector<int> >::const_iterator it = matchToIt.find(tid.size());
-		if(it == matchToIt.end())
-			ret = false;
-		else
-		{
-			const std::vector<int> & pattern = it->second;
-			for(int g=0; g<pattern.size(); ++g)
-			{
-				int val = -1;
-				boost::apply_visitor(TriggerIdMatchHelper(val, ermEnv, interptrig), tid[g]);
-				if(pattern[g] != val)
-				{
-					ret = false;
-				}
-			}
-		}
-	}
-	else
-	{
-		ret = allowNoIdetifier;
-	}
-
-	//check condition
-	if(ret)
-	{
-		if(trig.condition.is_initialized())
-		{
-			return ermEnv->checkCondition(trig.condition.get());
-		}
-		else //no condition
-			return true;
-	}
-	else
-		return false;
-}
 
 VERMInterpreter::ERMEnvironment::ERMEnvironment()
 {
@@ -2772,221 +1987,6 @@ void ERMInterpreter::loadScript(const std::string & name, const std::string & so
 	}
 }
 
-class TLiteralToJson : public boost::static_visitor<JsonNode>
-{
-public:
-	JsonNode operator()(char const & val) const
-	{
-		std::string tmp;
-		tmp.assign(1, val);
-		return JsonUtils::stringNode(tmp);
-	}
-
-	JsonNode operator()(double const & val) const
-	{
-		return JsonUtils::floatNode(val);
-	}
-
-	JsonNode operator()(ERM::ValType const & val) const
-	{
-		return JsonUtils::intNode(val);
-	}
-
-	JsonNode operator()(std::string const & val) const
-	{
-		return JsonUtils::stringNode(val);
-	}
-};
-
-class VOptionToJson : public boost::static_visitor<JsonNode>
-{
-public:
-	JsonNode operator()(VNIL const & opt) const
-	{
-		return JsonNode();
-	}
-	JsonNode operator()(VNode const & opt) const
-	{
-		JsonNode ret(JsonNode::JsonType::DATA_VECTOR);
-
-		for(auto & item : opt.children)
-			ret.Vector().push_back(boost::apply_visitor(VOptionToJson(), item));
-
-		return ret;
-	}
-	JsonNode operator()(VSymbol const & opt) const
-	{
-		return JsonNode();
-	}
-	JsonNode operator()(TLiteral const & opt) const
-	{
-		return boost::apply_visitor(TLiteralToJson(), opt);
-	}
-	JsonNode operator()(ERM::Tcommand const & opt) const
-	{
-		return JsonNode();
-	}
-	JsonNode operator()(VFunc const & opt) const
-	{
-		return JsonNode();
-	}
-};
-
-class JsonToVOption
-{
-public:
-	bool outer;
-	JsonToVOption(bool outer_)
-	:outer(outer_)
-	{}
-
-
-	VOption convert(const JsonNode & source)
-	{
-		switch(source.getType())
-		{
-		case JsonNode::JsonType::DATA_INTEGER:
-			{
-				TLiteral vval = static_cast<int>(source.Integer());
-
-				if(outer)
-				{
-					VOptionList box;
-					box.push_back(VSymbol("backquote"));
-					box.push_back(vval);
-					return VOption(VNode(box));
-				}
-				else
-				{
-					return VOption(vval);
-				}
-			}
-			break;
-		case JsonNode::JsonType::DATA_STRING:
-			{
-				TLiteral vval = source.String();
-				if(outer)
-				{
-					VOptionList box;
-					box.push_back(VSymbol("backquote"));
-					box.push_back(vval);
-					return VOption(VNode(box));
-				}
-				else
-				{
-					return VOption(vval);
-				}
-			}
-			break;
-		case JsonNode::JsonType::DATA_VECTOR:
-			{
-				if(outer)
-				{
-					VOptionList box;
-					box.emplace_back(VSymbol("backquote"));
-
-					VOptionList vval;
-
-					for(const JsonNode & elem : source.Vector())
-					{
-						vval.push_back(JsonToVOption(false).convert(elem));
-					}
-
-					box.emplace_back(VNode(vval));
-
-					return VOption(VNode(box));
-				}
-				else
-				{
-					VOptionList vval;
-
-					for(const JsonNode & elem : source.Vector())
-					{
-						vval.push_back(JsonToVOption(false).convert(elem));
-					}
-					return VOption(VNode(vval));
-				}
-			}
-			break;
-		default:
-			return VNIL();
-			break;
-		}
-	}
-};
-
-JsonNode ERMInterpreter::callGlobal(const std::string & name, const JsonNode & parameters)
-{
-	try
-	{
-		if(name.size()>4 && name[0] == '!' && name[1] == '!')
-		{
-			std::string trig = name.substr(2,2);
-			std::string numStr = name.substr(4);
-
-			int num = boost::lexical_cast<int>(numStr);
-
-			executeTriggerType(trig.c_str(), num);
-			return JsonNode();
-		}
-
-		if(!globalEnv->isBound(name, Environment::ANYWHERE))
-			throw ESymbolNotFound(name);
-
-		VOption & apiMethod = globalEnv->retrieveValue(name);
-
-		if(!isA<VFunc>(apiMethod))
-			throw EVermScriptExecError("API method must be implemented in a function");
-
-		VFunc f = getAs<VFunc>(apiMethod);
-
-		if(f.macro)
-			throw EVermScriptExecError("API method can not be macro");
-
-		VOptionList vparams;
-
-		if(parameters.getType() == JsonNode::JsonType::DATA_VECTOR)
-		{
-			for(const JsonNode & elem : parameters.Vector())
-			{
-				VOption opt = JsonToVOption(true).convert(elem);
-
-				vparams.push_back(opt);
-			}
-		}
-
-		VOption vret = f(this, VermTreeIterator(vparams));
-
-		return boost::apply_visitor(VOptionToJson(), vret);
-	}
-	catch(VERMInterpreter::EInterpreterProblem & ex)
-	{
-		logMod->error(ex.what());
-		return JsonUtils::stringNode(ex.what());
-	}
-}
-
-JsonNode ERMInterpreter::callGlobal(ServerCb * cb, const std::string & name, const JsonNode & parameters)
-{
-	acb = cb;
-
-	auto ret = callGlobal(name, parameters);
-
-	acb = nullptr;
-
-	return ret;
-}
-
-JsonNode ERMInterpreter::callGlobal(ServerBattleCb * cb, const std::string & name, const JsonNode & parameters)
-{
-	bacb = cb;
-
-	auto ret = callGlobal(name, parameters);
-
-	bacb = nullptr;
-
-	return ret;
-}
 
 std::string ERMInterpreter::convert()
 {
@@ -3020,85 +2020,6 @@ std::string ERMInterpreter::convert()
 	//TODO: !?PI
 
 	return out.str();
-}
-
-void ERMInterpreter::setGlobal(const std::string & name, int value)
-{
-	globalEnv->localBindLiteral(name, value);
-}
-
-void ERMInterpreter::setGlobal(const std::string & name, const std::string & value)
-{
-	globalEnv->localBindLiteral(name, value);
-}
-
-void ERMInterpreter::setGlobal(const std::string & name, double value)
-{
-	globalEnv->localBindLiteral(name, value);
-}
-
-void ERMInterpreter::init(const IGameInfoCallback * cb, const CBattleInfoCallback * battleCb)
-{
-	curFunc = nullptr;
-	curTrigger = nullptr;
-	icb = cb;
-	bicb = battleCb;
-
-	//TODO: reset?
-	for(int g = 0; g < ARRAY_COUNT(funcVars); ++g)
-		funcVars[g].reset();
-
-	scanScripts();
-
-	//TODO: execute every time for stateless context, only on new game otherwise
-
-	executeInstructions();
-	executeTriggerType("PI");
-}
-
-void ERMInterpreter::heroVisit(const CGHeroInstance *visitor, const CGObjectInstance *visitedObj, bool start)
-{
-	if(!visitedObj)
-		return;
-	setCurrentlyVisitedObj(visitedObj->pos);
-	TIDPattern tip;
-	tip[1] = {visitedObj->ID};
-	tip[2] = {visitedObj->ID, visitedObj->subID};
-	tip[3] = {visitedObj->pos.x, visitedObj->pos.y, visitedObj->pos.z};
-	executeTriggerType(VERMInterpreter::TriggerType("OB"), start, tip);
-}
-
-void ERMInterpreter::battleStart(const CCreatureSet *army1, const CCreatureSet *army2, int3 tile, const CGHeroInstance *hero1, const CGHeroInstance *hero2, bool side)
-{
-	executeTriggerType("BA", 0);
-	executeTriggerType("BR", -1);
-	executeTriggerType("BF", 0);
-	//TODO tactics or not
-}
-
-const CGObjectInstance * ERMInterpreter::getObjFrom( int3 pos )
-{
-	std::vector<const CGObjectInstance * > objs = icb->getVisitableObjs(pos);
-	if(!objs.size())
-		throw EScriptExecError("Attempt to obtain access to nonexistent object!");
-	return objs.back();
-}
-
-void ERMInterpreter::checkActionCallback() const
-{
-	if(!acb)
-		throw EScriptExecError("Game state change is not permitted in this environment");
-}
-
-void ERMInterpreter::showInfoDialog(const std::string & msg, PlayerColor player)
-{
-	//TODO: move to IF_M
-	checkActionCallback();
-
-	InfoWindow iw;
-	iw.player = player;
-	iw.text << msg;
-	acb->commitPackage(&iw);
 }
 
 struct VOptionPrinter : boost::static_visitor<>
@@ -3466,8 +2387,7 @@ struct VNodeEvaluator : boost::static_visitor<VOption>
 	}
 	VOption operator()(TLiteral const& opt) const
 	{
-		return opt;
-		//throw EVermScriptExecError("Literal does not evaluate to a function: "+boost::to_string(opt));
+		throw EVermScriptExecError("Literal does not evaluate to a function: "+boost::to_string(opt));
 	}
 	VOption operator()(ERM::Tcommand const& opt) const
 	{
@@ -3512,7 +2432,6 @@ struct VEvaluator : boost::static_visitor<VOption>
 	VOption operator()(ERM::Tcommand const& opt) const
 	{
 		//this is how FP works, evaluation == producing side effects
-		boost::apply_visitor(ERMExpDispatch(interp), opt.cmd);
 		//TODO: can we evaluate to smth more useful?
 		return VNIL();
 	}
@@ -3524,12 +2443,6 @@ struct VEvaluator : boost::static_visitor<VOption>
 
 VOption ERMInterpreter::eval(VOption line, Environment * env)
 {
-// 	if(line.children.isNil())
-// 		return;
-//
-// 	VOption & car = line.children.car().getAsItem();
-//	logger->trace("\tevaluating ");
-//	printVOption(line);
 	return boost::apply_visitor(VEvaluator(this, env ? *env : *topDyn), line);
 }
 
@@ -3542,28 +2455,6 @@ VOptionList ERMInterpreter::evalEach(VermTreeIterator list, Environment * env)
 	}
 	return ret;
 }
-
-//void ERMInterpreter::executeUserCommand(const std::string &cmd)
-//{
-//	logger->trace("ERM here: received command: %s", cmd);
-//	if(cmd.size() < 3)
-//	{
-//		logger->error("That can't be a valid command: %s", cmd);
-//		return;
-//	}
-//	try
-//	{
-//		if(cmd[0] == '!') //should be a neat (V)ERM command
-//		{
-//			ERM::TLine line = ERMParser::parseLine(cmd);
-//			executeLine(line);
-//		}
-//	}
-//	catch(std::exception &e)
-//	{
-//		logger->error("Failed executing user command! Exception info: %s", e.what());
-//	}
-//}
 
 namespace VERMInterpreter
 {
