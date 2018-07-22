@@ -4,7 +4,6 @@ local ERM =
 {
 	flag = {},
 	v = {},
-	x = {},
 	z = {}
 }
 

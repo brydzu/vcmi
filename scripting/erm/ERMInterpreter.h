@@ -105,7 +105,6 @@ namespace VERMInterpreter
 		{}
 	};
 
-
 	//		All numeric variables are integer variables and have a range of -2147483647...+2147483647
 	//		c			stores game active day number			//indirect variable
 	//		d			current value							//not an actual variable but a modifier
@@ -121,76 +120,25 @@ namespace VERMInterpreter
 	// 		z1..z1000	String variables						//global
 	// 		z-1..z-10	Function local string variables			//local
 
-	struct TriggerLocalVars
-	{
-		static const int EVAR_NUM = 100; //number of evar locals
-
-		static const int YVAR_NUM = 100; //number of yvar locals
-		TriggerLocalVars();
-
-		double & getEvar(int num);
-		int & getYvar(int num);
-	private:
-		double evar[EVAR_NUM]; //negative indices
-		int yvar[YVAR_NUM];
-
-	};
-
-	struct FunctionLocalVars
-	{
-		static const int NUM_PARAMETERS = 16; //number of function parameters
-		static const int NUM_LOCALS = 100;
-		static const int NUM_STRINGS = 10;
-		static const int NUM_FLOATINGS = 100;
-
-		int & getParam(int num);
-		int & getLocal(int num);
-		std::string & getString(int num);
-		double & getFloat(int num);
-		void reset();
-	private:
-		int params[NUM_PARAMETERS]; //x-vars
-		int locals[NUM_LOCALS]; //y-vars
-		std::string strings[NUM_STRINGS]; //z-vars (negative indices)
-		double floats[NUM_FLOATINGS]; //e-vars (positive indices)
-	};
-
-	struct ERMEnvironment
-	{
-		ERMEnvironment();
-		static const int NUM_QUICKS = 't' - 'f' + 1; //it should be 15
-		int & getQuickVar(const char letter); //'f' - 't' variables
-		int & getStandardVar(int num); //get v-variable
-		std::string & getZVar(int num);
-		bool & getFlag(int num);
-
-		static const int NUM_STANDARDS = 10000;
-
-		static const int NUM_STRINGS = 1000;
-
-		std::map<std::string, ERM::TVarExpNotMacro> macroBindings;
-
-		static const int NUM_FLAGS = 1000;
-	private:
-		int quickVars[NUM_QUICKS]; //referenced by letter ('f' to 't' inclusive)
-		int standardVars[NUM_STANDARDS]; //v-vars
-		std::string strings[NUM_STRINGS]; //z-vars (positive indices)
-		bool flags[NUM_FLAGS];
-	};
 
 	struct TriggerType
 	{
 		//the same order of trigger types in this enum and in validTriggers array is obligatory!
-		enum ETrigType{AE, BA, BF, BG, BR, CM, CO, FU, GE, GM, HE, HL, HM, IP, LE, MF, MG, MM, MR,
-			MW, OB, PI, SN, TH, TM};
+		enum ETrigType
+		{
+			AE, BA, BF, BG, BR, CM, CO, FU, GE, GM, HE, HL, HM, IP, LE, MF, MG, MM, MR,	MW, OB, PI, SN, TH, TM
+		};
 
 		ETrigType type;
 
 		static ETrigType convertTrigger(const std::string & trig)
 		{
-			static const std::string validTriggers[] = {"AE", "BA", "BF", "BG", "BR", "CM", "CO", "FU",
+			static const std::string validTriggers[] =
+			{
+				"AE", "BA", "BF", "BG", "BR", "CM", "CO", "FU",
 				"GE", "GM", "HE", "HL", "HM", "IP", "LE", "MF", "MG", "MM", "MR", "MW", "OB", "PI", "SN",
-				"TH", "TM"};
+				"TH", "TM"
+			};
 
 			for(int i=0; i<ARRAY_COUNT(validTriggers); ++i)
 			{
@@ -256,41 +204,10 @@ namespace VERMInterpreter
 		}
 	};
 
-	struct LexicalPtr
-	{
-		LinePointer line; //where to start
-		std::vector<int> entryPoints; //defines how to pass to current location
-
-		bool operator<(const LexicalPtr & sec) const
-		{
-			if(line != sec.line)
-				return line < sec.line;
-
-			if(entryPoints.size() != sec.entryPoints.size())
-				return entryPoints.size() < sec.entryPoints.size();
-
-			for(int g=0; g<entryPoints.size(); ++g)
-			{
-				if(entryPoints[g] < sec.entryPoints[g])
-					return true;
-			}
-
-			return false;
-		}
-	};
-
-	//call stack, represents dynamic range
-	struct Stack
-	{
-		std::vector<LexicalPtr> stack;
-	};
-
 	struct Trigger
 	{
 		LinePointer line;
-		TriggerLocalVars ermLocalVars;
-		Stack * stack; //where we are stuck at execution
-		Trigger() : stack(nullptr)
+		Trigger()
 		{}
 	};
 
@@ -391,9 +308,7 @@ namespace VERMInterpreter
 		}
 	};
 
-	struct VFunc;
-
-	typedef boost::variant<VNIL, boost::recursive_wrapper<VNode>, VSymbol, TLiteral, ERM::Tcommand, boost::recursive_wrapper<VFunc> > VOption; //options in v-expression, VNIl should be the default
+	typedef boost::variant<VNIL, boost::recursive_wrapper<VNode>, VSymbol, TLiteral, ERM::Tcommand> VOption; //options in v-expression, VNIl should be the default
 
 	template<typename T, typename SecType>
 	T& getAs(SecType & opt)
@@ -412,41 +327,6 @@ namespace VERMInterpreter
 		else
 			return false;
 	}
-
-
-	///main environment class, manages symbols
-	class Environment
-	{
-	private:
-		std::map<std::string, VOption> symbols;
-		Environment * parent;
-
-	public:
-		Environment() : parent(nullptr)
-		{}
-		void setParent(Environment * _parent);
-		Environment * getParent() const;
-		enum EIsBoundMode {GLOBAL_ONLY, LOCAL_ONLY, ANYWHERE};
-		bool isBound(const std::string & name, EIsBoundMode mode) const;
-
-		VOption & retrieveValue(const std::string & name);
-
-		enum EUnbindMode{LOCAL, RECURSIVE_UNTIL_HIT, FULLY_RECURSIVE};
-		///returns true if symbol was really unbound
-		bool unbind(const std::string & name, EUnbindMode mode);
-
-		void localBind(std::string name, const VOption & sym);
-		void bindAtFirstHit(std::string name, const VOption & sym); //if symbol is locally defines, it gets overwritten; otherwise it is bind globally
-	};
-
-	//this class just introduces a new dynamic range when instantiated, nothing more
-	class IntroduceDynamicEnv
-	{
-		ERMInterpreter * interp;
-	public:
-		IntroduceDynamicEnv(ERMInterpreter * interp_);
-		~IntroduceDynamicEnv();
-	};
 
 	struct VermTreeIterator
 	{
@@ -494,31 +374,6 @@ namespace VERMInterpreter
 		bool isNil() const;
 	};
 
-	struct VFunc
-	{
-		enum Eopt {DEFAULT, LT, GT, LE, GE, EQ, ADD, SUB, MULT, DIV, MOD} option;
-		std::vector<VSymbol> args;
-		VOptionList body;
-		bool macro; //true - act as macro, false - act as function
-		VFunc(const VOptionList & _body, bool asMacro = false) : option(DEFAULT), body(_body), macro(asMacro)
-		{}
-		VFunc(Eopt func) : option(func), macro(false)
-		{}
-		VFunc& operator=(const VFunc & rhs)
-		{
-			if(this == &rhs)
-			{
-				return *this;
-			}
-			args = rhs.args;
-			body = rhs.body;
-
-			return *this;
-		}
-
-		VOption operator()(ERMInterpreter * interp, VermTreeIterator params);
-	};
-
 	struct OptionConverterVisitor : boost::static_visitor<VOption>
 	{
 		VOption operator()(ERM::TVExp const& cmd) const;
@@ -542,177 +397,8 @@ namespace VERMInterpreter
 		VNode( const VOption & first, const VOptionList & rest); //merges given arguments into [a, rest];
 		void setVnode( const VOption & first, const VOptionList & rest);
 	};
-
-	//v printer
-
-	void printVOption(const VOption & opt);
 }
 
-struct IexpValStr
-{
-private:
-	union
-	{
-		int val;
-		int * integervar;
-		double * flvar;
-		std::string * stringvar;
-	} val;
-public:
-	std::string name;
-	std::string getName() const;
-
-	enum {WRONGVAL, INT, INTVAR, FLOATVAR, STRINGVAR} type;
-	void setTo(const IexpValStr & second);
-	void setTo(int val);
-	void setTo(double val);
-	void setTo(const std::string & val);
-	int getInt() const;
-	double getFloat() const;
-	std::string getString() const;
-
-	IexpValStr() : type(WRONGVAL)
-	{}
-	IexpValStr(int _val) : type(INT)
-	{
-		val.val = _val;
-	}
-	IexpValStr(int* _val) : type(INTVAR)
-	{
-		val.integervar = _val;
-	}
-	IexpValStr(double * _val) : type(FLOATVAR)
-	{
-		val.flvar = _val;
-	}
-	IexpValStr(std::string * _val) : type(STRINGVAR)
-	{
-		val.stringvar = _val;
-	}
-
-#define OPERATOR_DEFINITION_FULL(OPSIGN) \
-	template<typename T> \
-	IexpValStr operator OPSIGN(const T & sec) const \
-	{ \
-		IexpValStr ret = *this; \
-		switch (type) \
-		{ \
-		case INT: \
-		case INTVAR: \
-			ret.setTo(ret.getInt() OPSIGN sec); \
-			break; \
-		case FLOATVAR: \
-			ret.setTo(ret.getFloat() OPSIGN sec); \
-			break; \
-		case STRINGVAR: \
-			ret.setTo(ret.getString() OPSIGN sec); \
-			break; \
-		} \
-		return ret; \
-	} \
-	IexpValStr operator OPSIGN(const IexpValStr & sec) const \
-	{ \
-		IexpValStr ret = *this; \
-		switch (type) \
-		{ \
-		case INT: \
-		case INTVAR: \
-			ret.setTo(ret.getInt() OPSIGN sec.getInt()); \
-			break; \
-		case FLOATVAR: \
-			ret.setTo(ret.getFloat() OPSIGN sec.getFloat()); \
-			break; \
-		case STRINGVAR: \
-			ret.setTo(ret.getString() OPSIGN sec.getString()); \
-			break; \
-		} \
-		return ret; \
-	} \
-	template<typename T> \
-	IexpValStr & operator OPSIGN ## = (const T & sec) \
-	{ \
-		*this = *this OPSIGN sec; \
-		return *this; \
-	}
-
-#define OPERATOR_DEFINITION(OPSIGN) \
-	template<typename T> \
-	IexpValStr operator OPSIGN(const T & sec) const \
-	{ \
-		IexpValStr ret = *this; \
-		switch (type) \
-		{ \
-		case INT: \
-		case INTVAR: \
-			ret.setTo(ret.getInt() OPSIGN sec); \
-			break; \
-		case FLOATVAR: \
-			ret.setTo(ret.getFloat() OPSIGN sec); \
-			break; \
-		} \
-		return ret; \
-	} \
-	IexpValStr operator OPSIGN(const IexpValStr & sec) const \
-	{ \
-		IexpValStr ret = *this; \
-		switch (type) \
-		{ \
-		case INT: \
-		case INTVAR: \
-			ret.setTo(ret.getInt() OPSIGN sec.getInt()); \
-			break; \
-		case FLOATVAR: \
-			ret.setTo(ret.getFloat() OPSIGN sec.getFloat()); \
-			break; \
-		} \
-		return ret; \
-	} \
-	template<typename T> \
-	IexpValStr & operator OPSIGN ## = (const T & sec) \
-	{ \
-		*this = *this OPSIGN sec; \
-		return *this; \
-	}
-
-#define OPERATOR_DEFINITION_INTEGER(OPSIGN) \
-	template<typename T> \
-	IexpValStr operator OPSIGN(const T & sec) const \
-	{ \
-		IexpValStr ret = *this; \
-		switch (type) \
-		{ \
-		case INT: \
-		case INTVAR: \
-			ret.setTo(ret.getInt() OPSIGN sec); \
-			break; \
-		} \
-		return ret; \
-	} \
-	IexpValStr operator OPSIGN(const IexpValStr & sec) const \
-	{ \
-		IexpValStr ret = *this; \
-		switch (type) \
-		{ \
-		case INT: \
-		case INTVAR: \
-			ret.setTo(ret.getInt() OPSIGN sec.getInt()); \
-			break; \
-		} \
-		return ret; \
-	} \
-	template<typename T> \
-	IexpValStr & operator OPSIGN ## = (const T & sec) \
-	{ \
-		*this = *this OPSIGN sec; \
-		return *this; \
-	}
-
-	OPERATOR_DEFINITION_FULL(+)
-	OPERATOR_DEFINITION(-)
-	OPERATOR_DEFINITION(*)
-	OPERATOR_DEFINITION(/)
-	OPERATOR_DEFINITION_INTEGER(%)
-};
 
 class ERMInterpreter
 {
@@ -726,45 +412,28 @@ class ERMInterpreter
 	ERM::TLine &retrieveLine(VERMInterpreter::LinePointer linePtr);
 	static ERM::TTriggerBase & retrieveTrigger(ERM::TLine &line);
 
-	VERMInterpreter::Environment * globalEnv;
-	VERMInterpreter::Environment * topDyn;
-
-	VERMInterpreter::ERMEnvironment * ermGlobalEnv;
 
 	typedef std::map<VERMInterpreter::TriggerType, std::vector<VERMInterpreter::Trigger> > TtriggerListType;
 	TtriggerListType triggers, postTriggers;
-	VERMInterpreter::Trigger * curTrigger;
-	VERMInterpreter::FunctionLocalVars * curFunc;
-	static const int TRIG_FUNC_NUM = 30000;
-	VERMInterpreter::FunctionLocalVars funcVars[TRIG_FUNC_NUM + 1]; //+1 because we use [0] as a global set of y-vars
-	VERMInterpreter::FunctionLocalVars * getFuncVars(int funNum); //0 is a global func-like set
 
 	static const std::string triggerSymbol, postTriggerSymbol, defunSymbol;
 
-	void executeLine(const VERMInterpreter::LinePointer & lp);
-	void executeLine(const ERM::TLine &line);
-	void executeTrigger(VERMInterpreter::Trigger & trig, int funNum = -1, std::vector<int> funParams=std::vector<int>());
 	static bool isCMDATrigger(const ERM::Tcommand & cmd);
 	static bool isATrigger(const ERM::TLine & line);
 	static ERM::EVOtions getExpType(const ERM::TVOption & opt);
-	IexpValStr getVar(std::string toFollow, boost::optional<int> initVal) const;
 
-	std::string processERMString(std::string ermstring);
-
-	VERMInterpreter::VOption eval( VERMInterpreter::VOption line, VERMInterpreter::Environment * env = nullptr );
-	VERMInterpreter::VOptionList evalEach( VERMInterpreter::VermTreeIterator list, VERMInterpreter::Environment * env = nullptr );
 
 public:
 	vstd::CLoggerBase * logger;
 
-	typedef std::map< int, std::vector<int> > TIDPattern;
+
+	ERMInterpreter(vstd::CLoggerBase * logger_);
+	virtual ~ERMInterpreter();
+
 	void executeInstructions(); //called when starting a new game, before most of the map settings are done
 
 	void scanScripts(); //scans for functions, triggers etc.
 
-	ERMInterpreter(vstd::CLoggerBase * logger_);
-	virtual ~ERMInterpreter();
-	bool checkCondition( ERM::Tcondition cond );
 	int getRealLine(const VERMInterpreter::LinePointer &lp);
 
 	void loadScript(const std::string & name, const std::string & source);
