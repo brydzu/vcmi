@@ -11,6 +11,8 @@
 
 #include "InfoWindow.h"
 
+#include "../../LuaStack.h"
+
 #include "../Registry.h"
 
 using scripting::api::netpacks::InfoWindowProxy;

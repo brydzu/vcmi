@@ -13,9 +13,12 @@
 
 #include <vstd/StringUtils.h>
 
+#include "LuaStack.h"
+
 #include "api/Registry.h"
 
 #include "api/ServerCb.h"
+#include "api/BattleServerCb.h"
 
 #include "../../lib/JsonNode.h"
 #include "../../lib/NetPacks.h"
@@ -99,13 +102,6 @@ void LuaContext::init(const IGameInfoCallback * cb, const CBattleInfoCallback * 
 	}
 }
 
-void LuaContext::error(const std::string & message)
-{
-	//do not log here
-	push(message);
-	lua_error(L);
-}
-
 int LuaContext::errorRetVoid(const std::string & message)
 {
 	logger->error(message);
@@ -124,19 +120,17 @@ JsonNode LuaContext::callGlobal(const std::string & name, const JsonNode & param
 
 		logger->error(fmt.str());
 
-		return JsonUtils::stringNode(fmt.str());
+		popAll();
+
+		return JsonNode();
 	}
 
 	int argc = parameters.Vector().size();
 
-	if(argc)
+	for(int idx = 0; idx < argc; idx++)
 	{
-		for(int idx = 0; idx < parameters.Vector().size(); idx++)
-		{
-			push(parameters.Vector()[idx]);
-		}
+		push(parameters.Vector()[idx]);
 	}
-
 
 	if(lua_pcall(L, argc, 1, 0))
 	{
@@ -147,7 +141,9 @@ JsonNode LuaContext::callGlobal(const std::string & name, const JsonNode & param
 
 		logger->error(fmt.str());
 
-		return JsonUtils::stringNode(fmt.str());
+		popAll();
+
+		return JsonNode();
 	}
 
 	JsonNode ret;
@@ -172,11 +168,13 @@ JsonNode LuaContext::callGlobal(ServerCb * cb, const std::string & name, const J
 
 JsonNode LuaContext::callGlobal(ServerBattleCb * cb, const std::string & name, const JsonNode & parameters)
 {
-	bacb = cb;
+	push(cb);
+	lua_setglobal(L, "BATTLESERVER");
 
 	auto ret = callGlobal(name, parameters);
 
-	bacb = nullptr;
+	lua_pushnil(L);
+	lua_setglobal(L, "BATTLESERVER");
 
 	return ret;
 }
@@ -241,9 +239,7 @@ void LuaContext::push(const JsonNode & value)
             for(int idx = 0; idx < value.Vector().size(); idx++)
 			{
 				lua_pushinteger(L, idx + 1);
-
 				push(value.Vector()[idx]);
-
 				lua_settable(L, -3);
 			}
 		}
@@ -272,7 +268,7 @@ void LuaContext::pop(JsonNode & value)
 		break;
 	case LUA_TTABLE:
 		value.clear(); //TODO:
-		error("Not implemented");
+		logger->error("Not implemented: pop table as JsonNode");
 		break;
 	default:
 		value.clear();
@@ -298,6 +294,11 @@ void LuaContext::push(ServerCb * cb)
 	api::ServerCbProxy::Wrapper::push(L, cb);
 }
 
+void LuaContext::push(ServerBattleCb * cb)
+{
+	api::BattleServerCbProxy::Wrapper::push(L, cb);
+}
+
 void LuaContext::popAll()
 {
 	lua_settop(L, 0);
@@ -316,6 +317,7 @@ void LuaContext::registerCore()
 	lua_setglobal(L, "require");
 
 	api::ServerCbProxy::Wrapper::registrator(L);
+	api::BattleServerCbProxy::Wrapper::registrator(L);
 }
 
 int LuaContext::require(lua_State * L)

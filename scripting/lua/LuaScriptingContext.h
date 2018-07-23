@@ -26,9 +26,6 @@ public:
 
 	void init(const IGameInfoCallback * cb, const CBattleInfoCallback * battleCb);
 
-	//no return, Lua internally throws
-	void error(const std::string & message);
-
 	//log error and return nil from LuaCFunction
 	int errorRetVoid(const std::string & message);
 
@@ -48,6 +45,7 @@ public:
 	void push(const std::string & value);
 	void push(lua_CFunction f, void * opaque);
 	void push(ServerCb * cb);
+	void push(ServerBattleCb * cb);
 
 	std::string toStringRaw(int index);
 
@@ -60,7 +58,6 @@ private:
 
 	const IGameInfoCallback * icb;
 	const CBattleInfoCallback * bicb;
-	ServerBattleCb * bacb;
 
 	void cleanupGlobals();
 

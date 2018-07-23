@@ -159,6 +159,7 @@
 		<Unit filename="testdata/erm/SpellEffectAPITest.verm" />
 		<Unit filename="testdata/erm/std.verm" />
 		<Unit filename="testdata/erm/testy.erm" />
+		<Unit filename="testdata/lua/SpellEffectAPIMoveUnit.lua" />
 		<Unit filename="testdata/lua/SpellEffectAPITest.lua" />
 		<Unit filename="testdata/rmg/1.json" />
 		<Extensions>

@@ -69,15 +69,21 @@
 		<Unit filename="LuaScriptingContext.h" />
 		<Unit filename="LuaSpellEffect.cpp" />
 		<Unit filename="LuaSpellEffect.h" />
+		<Unit filename="LuaStack.cpp" />
+		<Unit filename="LuaStack.h" />
 		<Unit filename="LuaWrapper.h" />
 		<Unit filename="StdInc.h">
 			<Option compile="1" />
 			<Option weight="0" />
 		</Unit>
+		<Unit filename="api/BattleServerCb.cpp" />
+		<Unit filename="api/BattleServerCb.h" />
 		<Unit filename="api/Registry.cpp" />
 		<Unit filename="api/Registry.h" />
 		<Unit filename="api/ServerCb.cpp" />
 		<Unit filename="api/ServerCb.h" />
+		<Unit filename="api/netpacks/BattleStackMoved.cpp" />
+		<Unit filename="api/netpacks/BattleStackMoved.h" />
 		<Unit filename="api/netpacks/InfoWindow.cpp" />
 		<Unit filename="api/netpacks/InfoWindow.h" />
 		<Unit filename="api/netpacks/PackForClient.h" />
